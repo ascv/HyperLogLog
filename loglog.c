@@ -33,19 +33,19 @@ int main(int argc, char ** argv) {
 
   fclose(fp);
 
-  double alpha_m = 0.0;
+  double alphaM = 0.0;
   switch (size) {
   case 16:
-    alpha_m = 0.673;
+    alphaM = 0.673;
     break;
   case 32:
-    alpha_m = 0.697;
+    alphaM = 0.697;
     break;
   case 64:
-    alpha_m = 0.709;
+    alphaM = 0.709;
     break;
   default:
-    alpha_m = 0.7213/(1.0 + 1.079/(double) size);
+    alphaM = 0.7213/(1.0 + 1.079/(double) size);
     break;
   }
   
@@ -55,7 +55,7 @@ int main(int argc, char ** argv) {
   }
 
   double max = pow(2, 32);
-  double estimate = alpha_m * pow(sum, -1) * pow(size, 2);
+  double estimate = alphaM * pow(sum, -1) * pow(size, 2);
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
