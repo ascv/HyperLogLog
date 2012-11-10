@@ -2,6 +2,7 @@
 
 /*
  * To do: arguments: k, v, characters scanned, tests
+ * change pow(2, 32) to literal, rename leading zero count, add old hash functions back in
  */
 
 int main(int argc, char ** argv) {
@@ -9,7 +10,6 @@ int main(int argc, char ** argv) {
   FILE *fp;
   char temp [100] = "";
   int k = 12;
-
 
   if ((fp = fopen(*++argv, "r")) == NULL) { 
     fp = stdin; 
@@ -25,7 +25,7 @@ int main(int argc, char ** argv) {
 
   while ((fscanf(fp, "%100s", temp)) == 1) {
     uint32_t hash = qhashmurmur3_32((void *) temp, strlen(temp));
-    uint32_t index = 1 + (hash >> (32 - k));
+    uint32_t index = hash >> (32 - k);
     uint32_t rank = lzc((hash << k) >> k) - k + 1;
     if (rank > M[index])
       M[index] = rank;
@@ -54,22 +54,22 @@ int main(int argc, char ** argv) {
     sum = sum + (1.0/(pow(2.0, (double)M[i])));
   }
 
-
-  double estimate = alpha_m * pow(sum, -1) * pow((double)size,2);
+  double max = pow(2, 32);
+  double estimate = alpha_m * pow(sum, -1) * pow(size, 2);
   uint32_t * int_estimate = (uint32_t *) &estimate; // TODO: remove extra pointer
 
-  if (estimate <= 2.5*size) {
+  if (estimate <= 2.5 * size) {
     double oneBits = (double) hamming_distance(*int_estimate);
     if (oneBits != 0.0) {
       estimate = size * log(size/oneBits);
     }
   }
 
-  if (estimate <= (1.0/3.0) * pow(2, 32)) {
+  if (estimate <= (1.0/3.0) * max) {
     estimate = estimate;
   }
-  else if (estimate > (1.0/3.0) * pow(2, 32)) {
-    estimate = (-1.0 * pow(2, 32)) * log(1.0 - (estimate/(pow(2,32))));
+  else if (estimate > (1.0/3.0) * max) {
+    estimate = (-1.0 * max) * log(1.0 - estimate/max);
   }
 
   printf("%lf\n", estimate);
