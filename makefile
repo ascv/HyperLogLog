@@ -1,10 +1,10 @@
-loglog:
-	gcc -Wall -g loglog.h loglog.c murmur.c -lm -o loglog
+CFLAGS = -Wall -g -lm
+OBJS = loglog.o
+SRCS = loglog.c hash.c
+HDRS = loglog.h
 
-all: 
-	gcc -Wall -g loglog.h loglog.c hash.c -lm -o loglog
+all:
+	gcc loglog.c hash.c loglog.h $(CFLAGS) -o loglog
 
-clean: 
-	rm loglog *~ -f
-
-
+clean:
+	rm loglog *o -f
