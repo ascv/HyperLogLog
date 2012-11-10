@@ -56,10 +56,10 @@ int main(int argc, char ** argv) {
 
   double max = pow(2, 32);
   double estimate = alpha_m * pow(sum, -1) * pow(size, 2);
-  uint32_t * int_estimate = (uint32_t *) &estimate;
+  uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
-    double oneBits = (double) hamming_distance(*int_estimate);
+    double oneBits = (double) hamming_distance(*intEstimate);
     if (oneBits != 0.0) {
       estimate = size * log(size/oneBits);
     }
