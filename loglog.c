@@ -1,0 +1,77 @@
+#include "loglog.h"
+
+/*
+ * To do: arguments: k, v, characters scanned, tests
+ */
+
+int main(int argc, char ** argv) {
+
+  FILE *fp;
+  char temp [100] = "";
+  int k = 12;
+
+
+  if ((fp = fopen(*++argv, "r")) == NULL) { 
+    fp = stdin; 
+  }
+
+  u_int32_t size = 1 << k;
+  u_int32_t M[size];
+
+  int i;
+  for (i = 0; i < size; i++) {
+    M[i] = 0;
+  }
+
+  while ((fscanf(fp, "%100s", temp)) == 1) {
+    uint32_t hash = qhashmurmur3_32((void *) temp, strlen(temp));
+    uint32_t index = 1 + (hash >> (32 - k));
+    uint32_t rank = lzc((hash << k) >> k) - k + 1;
+    if (rank > M[index])
+      M[index] = rank;
+  }
+
+  fclose(fp);
+
+  double alpha_m = 0.0;
+  switch (size) {
+  case 16:
+    alpha_m = 0.673;
+    break;
+  case 32:
+    alpha_m = 0.697;
+    break;
+  case 64:
+    alpha_m = 0.709;
+    break;
+  default:
+    alpha_m = 0.7213/(1.0+(1.079/((double)size)));
+    break;
+  }
+  
+  double sum = 0.0;
+  for (i = 0; i < size; i++) {
+    sum = sum + (1.0/(pow(2.0, (double)M[i])));
+  }
+
+
+  double estimate = alpha_m * pow(sum, -1) * pow((double)size,2);
+  uint32_t * int_estimate = (uint32_t *) &estimate; // TODO: remove extra pointer
+
+  if (estimate <= 2.5*size) {
+    double oneBits = (double) hamming_distance(*int_estimate);
+    if (oneBits != 0.0) {
+      estimate = size * log(size/oneBits);
+    }
+  }
+
+  if (estimate <= (1.0/3.0) * pow(2, 32)) {
+    estimate = estimate;
+  }
+  else if (estimate > (1.0/3.0) * pow(2, 32)) {
+    estimate = (-1.0 * pow(2, 32)) * log(1.0 - (estimate/(pow(2,32))));
+  }
+
+  printf("%lf\n", estimate);
+  return 1;
+}
