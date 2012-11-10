@@ -51,7 +51,7 @@ int main(int argc, char ** argv) {
   
   double sum = 0.0;
   for (i = 0; i < size; i++) {
-    sum = sum + (1.0/(pow(2.0, (double)M[i])));
+    sum = sum + 1.0/pow(2, (double) M[i]);
   }
 
   double max = pow(2, 32);
