@@ -1,18 +1,5 @@
 #include "loglog.h"
 
-/*
-* Get the hamming distance of x and 0xFFFFFFFF.
-*/
-uint32_t hammingDistance(uint32_t x) {
-  uint32_t dist = 0;
-  uint32_t val =   x ^ 0xFFFFFFFF;
-  while(val) {
-    ++dist; 
-    val &= val - 1;
-  }
-  return dist;
-}
-
 /* 
 * Get the number of leading zeros in x.
 */
