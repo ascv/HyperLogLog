@@ -23,14 +23,16 @@ int main(int argc, char ** argv) {
     M[i] = 0;
   }
 
+  uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
   while ((fscanf(fp, "%100s", buffer)) == 1) {
-    uint32_t hash = qhashmurmur3_32((void *) buffer, strlen(buffer));
-    uint32_t index = hash >> (32 - k);
-    uint32_t rank = lzc((hash << k) >> k) - k + 1;
+    MurmurHash3_x86_32((void *) buffer, strlen(buffer), 42, (void *) hash);
+    uint32_t index = *hash >> (32 - k);
+    uint32_t rank = lzc((*hash << k) >> k) - k + 1;
     if (rank > M[index])
       M[index] = rank;
   }
 
+  free(hash);
   fclose(fp);
 
   double alphaM = 0.0;
