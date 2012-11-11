@@ -6,11 +6,10 @@
 #include <math.h>
 #include "murmur3.h"
 
+uint32_t leadingZeroCount(uint32_t x);
+
 uint32_t ones(uint32_t x);
 
-uint32_t hammingDistance(uint32_t x);
-
-uint32_t leadingZeroCount(uint32_t x);
 
 
 
