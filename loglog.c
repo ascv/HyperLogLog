@@ -4,11 +4,9 @@ int main(int argc, char ** argv) {
 
   FILE *fp;
   char buffer [100] = "";
-
   uint32_t k = 12;
   uint32_t size = 1 << k;
   uint32_t M[size];
-
   uint32_t rank;
   uint32_t index;
   uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
@@ -54,14 +52,14 @@ int main(int argc, char ** argv) {
     sum = sum + 1.0/pow(2, (double) M[i]);
   }
 
-  double max = pow(2, 32);
+  double max = 0x7FF0000000000000;
   double estimate = alphaM * pow(sum, -1) * pow(size, 2);
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
-    uint32_t zeroBits = 32 - ones(*intEstimate);
-    if (zeroBits != 0) {
-      estimate = size * log(size/zeroBits);
+    uint32_t zeros = 32 - ones(*intEstimate);
+    if (zeros != 0) {
+      estimate = size * log(size/zeros);
     }
   }
 
