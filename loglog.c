@@ -4,9 +4,10 @@ int main(int argc, char ** argv) {
 
   FILE *fp;
   char buffer [100] = "";
+
   uint32_t k = 12;
-  u_int32_t size = 1 << k;
-  u_int32_t M[size];
+  uint32_t size = 1 << k;
+  uint32_t M[size];
   uint32_t rank = 0;
   uint32_t index = 0;
   uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
