@@ -61,7 +61,7 @@ int main(int argc, char ** argv) {
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
-    double oneBits = (double) hamming_distance(*intEstimate);
+    double oneBits = (double) hammingDistance(*intEstimate);
     if (oneBits != 0.0) {
       estimate = size * log(size/oneBits);
     }
