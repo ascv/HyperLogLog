@@ -18,7 +18,7 @@ int main(int argc, char ** argv) {
   }
 
   if ((fp = fopen(*++argv, "r")) == NULL) { 
-    fp = stdin; 
+    fp = stdin;
   }
 
   while ((fscanf(fp, "%100s", buffer)) == 1) {
@@ -58,8 +58,8 @@ int main(int argc, char ** argv) {
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
-    double oneBits = (double) hammingDistance(*intEstimate);
-    if (oneBits != 0.0) {
+    uint32_t oneBits = hammingDistance(*intEstimate);
+    if (oneBits != 0) {
       estimate = size * log(size/oneBits);
     }
   }
@@ -71,6 +71,6 @@ int main(int argc, char ** argv) {
     estimate = (-1.0 * max) * log(1.0 - estimate/max);
   }
 
-  printf("%lf\n", estimate);
+  printf("%.3lf\n", estimate);
   return 1;
 }
