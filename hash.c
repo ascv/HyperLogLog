@@ -17,7 +17,7 @@ uint32_t qhashfnv1_32(const void *data, size_t nbytes) {
   return h;
 }
 
-uint32_t rank(uint32_t x) {
+uint32_t leadingZeroCount(uint32_t x) {
   x |= (x >> 1);
   x |= (x >> 2);
   x |= (x >> 4);
