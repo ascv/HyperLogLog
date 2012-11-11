@@ -1,10 +1,5 @@
 #include "loglog.h"
 
-/*
- * To do: arguments: k, v, characters scanned, tests
- * rename leading zero count, add old hash functions back in
- */
-
 int main(int argc, char ** argv) {
 
   FILE *fp;
