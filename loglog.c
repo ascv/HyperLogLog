@@ -8,8 +8,9 @@ int main(int argc, char ** argv) {
   uint32_t k = 12;
   uint32_t size = 1 << k;
   uint32_t M[size];
-  uint32_t rank = 0;
-  uint32_t index = 0;
+
+  uint32_t rank;
+  uint32_t index;
   uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
 
   uint32_t i;
@@ -58,9 +59,9 @@ int main(int argc, char ** argv) {
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
   if (estimate <= 2.5 * size) {
-    uint32_t oneBits = hammingDistance(*intEstimate);
-    if (oneBits != 0) {
-      estimate = size * log(size/oneBits);
+    uint32_t zeroBits = 32 - ones(*intEstimate);
+    if (zeroBits != 0) {
+      estimate = size * log(size/zeroBits);
     }
   }
 
