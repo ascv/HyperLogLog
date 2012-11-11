@@ -5,22 +5,21 @@ int main(int argc, char ** argv) {
   FILE *fp;
   char buffer [100] = "";
   uint32_t k = 12;
-
-  if ((fp = fopen(*++argv, "r")) == NULL) { 
-    fp = stdin; 
-  }
-
   u_int32_t size = 1 << k;
   u_int32_t M[size];
+  uint32_t rank = 0;
+  uint32_t index = 0;
+  uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
 
   uint32_t i;
   for (i = 0; i < size; i++) {
     M[i] = 0;
   }
 
-  uint32_t rank = 0;
-  uint32_t index = 0;
-  uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
+  if ((fp = fopen(*++argv, "r")) == NULL) { 
+    fp = stdin; 
+  }
+
   while ((fscanf(fp, "%100s", buffer)) == 1) {
     MurmurHash3_x86_32((void *) buffer, strlen(buffer), 42, (void *) hash);
     index = *hash >> (32 - k);
