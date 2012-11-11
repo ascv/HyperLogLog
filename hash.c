@@ -1,22 +1,5 @@
 #include "loglog.h"
 
-uint32_t qhashfnv1_32(const void *data, size_t nbytes) {
-  if (data == NULL || nbytes == 0) return 0;
- 
-  unsigned char *dp;
-  uint32_t h = 0x811C9DC5;
- 
-  for (dp = (unsigned char *)data; *dp && nbytes > 0; dp++, nbytes--) {
-#ifdef __GNUC__
-    h += (h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24);
-#else
-    h *= 0x01000193;
-#endif
-    h ^= *dp;
-  }
-  return h;
-}
-
 uint32_t leadingZeroCount(uint32_t x) {
   x |= (x >> 1);
   x |= (x >> 2);
@@ -35,7 +18,7 @@ uint32_t ones(uint32_t x) {
   return(x & 0x0000003F);
 }
 
-uint32_t jenkins_one_at_a_time_hash(const void *data, size_t len) {
+uint32_t jenkinsHash(const void *data, size_t len) {
   char * key = (char *)data;
   uint32_t hash, i;
   for(hash = i = 0; i < len; ++i) {
