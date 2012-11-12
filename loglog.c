@@ -16,7 +16,7 @@ int main(int argc, char ** argv) {
     M[i] = 0;
   }
 
-  if ((fp = fopen(*++argv, "r")) == NULL) { 
+  if ((fp = fopen(*++argv, "r")) == NULL) {
     fp = stdin;
   }
 
@@ -52,7 +52,7 @@ int main(int argc, char ** argv) {
     sum = sum + 1.0/pow(2, (double) M[i]);
   }
 
-  double max = 0x7FF0000000000000;
+  double max = (double) 0x7FFFFFFF;
   double estimate = alphaM * pow(sum, -1) * pow(size, 2);
   uint32_t * intEstimate = (uint32_t *) &estimate;
 
