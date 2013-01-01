@@ -21,7 +21,7 @@ int main(int argc, char ** argv) {
 	  fp = fopen(optarg, "r");
 	  break;
     }
-    opt = getopt( argc, argv, optString );
+    opt = getopt(argc, argv, optString);
   }
 
   if (k < 2 || k > 15) {
