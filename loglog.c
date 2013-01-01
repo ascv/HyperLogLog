@@ -15,7 +15,7 @@ int main(int argc, char ** argv) {
   uint32_t * hash = (uint32_t *) malloc(sizeof(uint32_t));
   //uint32_t * ranks = NULL;
   uint32_t index;
-  uint32_t k = - 1;
+  uint32_t k = -1;
   uint32_t maxCharacters = 100;
   uint32_t murmur3Seed = 314;
   uint32_t opt;
@@ -41,14 +41,14 @@ int main(int argc, char ** argv) {
     opt = getopt( argc, argv, optString );
   }
   
-  printf("chars: %d seed: %d k: %d\n", maxCharacters, murmur3Seed, k);
+  //printf("chars: %d seed: %d k: %d\n", maxCharacters, murmur3Seed, k);
 
   if (k == -1) {
     printf("Error: k not set. Use -k to set k.\n");
     exit(1);
   }
   if (k < 2 || k > 15) {
-    printf("Error: number of buckets must in the range 2-15.\n");
+    printf("Error: k must in the range 2-15.\n");
     exit(1);
   }
   if (maxCharacters <= 0) {
