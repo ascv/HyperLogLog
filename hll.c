@@ -25,15 +25,15 @@ int main(int argc, char ** argv) {
   }
 
   if (k < 2 || k > 15) {
-    printf("Error: k must in the range 2-15. Use -k to set k.\n");
+    fprintf(stderr, "hll error: k must in the range 2-15. Use -k to set k.\n");
     exit(1);
   }
   if (fp == NULL) { 
     fp = stdin; 
   }
 
-  double cardinalityEstimate = hyperLogLog(fp, k, murmur3Seed);
+  double cardinality = hyperLogLog(fp, k, murmur3Seed);
   fclose(fp);
-  printf("%.3lf\n", cardinalityEstimate);
+  printf("%.3lf\n", cardinality);
   return 0;
 }
