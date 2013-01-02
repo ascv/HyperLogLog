@@ -1,8 +1,9 @@
 CFLAGS = -Wall -g -lm -o
-SRCS = loglog.c lib.c murmur3.c
+SRCS = hll.c loglog.c lib.c murmur3.c
 
 all:
-	gcc $(SRCS) $(CFLAGS) loglog
+	gcc $(SRCS) $(CFLAGS) hll
 
 clean:
 	rm loglog *o -f
+
