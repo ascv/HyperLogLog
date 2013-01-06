@@ -23,3 +23,7 @@ Using a file:
 Or reading from stdin:
 
     cat somefile | ./hll -k 12 -s 44
+
+## References
+
+[1] http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf
