@@ -1,8 +1,8 @@
-## Overview
+## hll overview
 
-A demonstration of the HyperLogLog algorithm given in [1]. The demo
-returns the number of distinct words, reading up to 100 characters in a single
-word.
+hll is a demo implementation of the HyperLogLog algorithm for cardinality
+estimation given in [1]. The demo returns the number of distinct words, 
+reading up to 100 characters in a single word.
 
 ## Setup
 
