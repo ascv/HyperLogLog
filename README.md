@@ -11,7 +11,7 @@ word.
 ## Options
 
 * -f the file to estimate on, if this is not set, then read from stdin
-* -k use 2^k buckets
+* -k use 2^k registers
 * -s seed value for Murmur3
 
 ## Example usage
