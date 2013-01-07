@@ -1,6 +1,6 @@
 ## Overview
 
-A demonstration of the HyperLogLog algorithm given by <authors>[1]. The demo
+A demonstration of the HyperLogLog algorithm given in [1]. The demo
 returns the number of distinct words, reading up to 100 characters in a single
 word.
 
