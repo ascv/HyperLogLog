@@ -2,7 +2,7 @@
 
 /*
  * Gets a cardinality estimate of the words in |file| using 2^|k| buckets and
- * |seed| to seed MurmurHash3.
+ * |seed| to seed MurmurHash3. Reads at most 100 characters in a word.
  */
 double hyperLogLog(FILE * file, uint32_t k, uint32_t seed) {
 
