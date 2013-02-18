@@ -1,8 +1,8 @@
-This is a demonstration of the HyperLogLog algorithm implemented in C as a command line program. 
+This is a demonstration of the HyperLogLog algorithm using a Murmur3 hash function. 
 While HLL operates independently of the encoding (e.g. it is irrelevant whether elements in the 
 input data set are text files or images) this program operates only on strings and reads up to 100 
 characters for any individual string from the input data set. In other words, it returns the number
-of distinct words in the input data set.
+of distinct words in the input data set. 
 
 ## Setup
 
