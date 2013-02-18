@@ -18,7 +18,7 @@ of distinct words in the input data set.
 
 Using a file:
 
-    ./hll -k 12 -s 44 -f sometextfile
+    ./hll -k 12 -f sometextfile
 
 Or reading from stdin:
 
