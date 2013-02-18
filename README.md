@@ -1,8 +1,8 @@
 This is a demonstration of the HyperLogLog algorithm implemented in C as a command line program. 
-HLL can space efficiently estimate the cardinality of very large data set. While HLL operates
-independently of the encoding, e.g. it is irrelevant whether elements in the input data set are
-text files or images, this program operates only on strings reading up to 100 characters for any
-individual string in the input data set.
+While HLL operates independently of the encoding, e.g. it is irrelevant whether elements in the 
+input data set aretext files or images, this program operates only on strings and reads up to 100 
+characters for any individual string from the input data set. In other words, it returns the number
+of distinct words in the input data set.
 
 ## Setup
 
