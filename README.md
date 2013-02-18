@@ -11,8 +11,8 @@ of distinct words in the input data set.
 ## Options
 
 * -f the file to estimate on, if this is not set, then read from stdin
-* -k use 2^k registers to store the rank (maximum 
-* -s seed value for Murmur3
+* -k use 2^k registers to store the rank (number of leading zeros)
+* -s seed value for Murmur3 (defaults to 42)
 
 ## Example usage
 
