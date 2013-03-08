@@ -53,7 +53,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject * args)
     const uint32_t dataLength;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
-      return NULL; //TODO: add error
+        return NULL; //TODO: add error
 
     uint32_t *hash = (uint32_t *) malloc(sizeof(uint32_t));
     uint32_t index;
@@ -106,12 +106,19 @@ HyperLogLog_cardinality(HyperLogLog *self)
     double estimate = alpha * (1/sum) * self->size * self->size;
     
     if (estimate <= 2.5 * self->size) {
-        const uint32_t zeros = 32 - ones((int32_t) estimate);
+        uint32_t zeros = 0;
+	uint32_t i;
+
+	for (i = 0; i < self->size; i++) {
+	    if (self->registers == 0)
+	        zeros += 1;
+	}
+
         if (zeros != 0)
-          estimate = self->size * log(self->size/zeros);
+            estimate = self->size * log(self->size/zeros);
     }
     
-    if (estimate <= (1.0/3.0) * j)
+    if (estimate <= (1.0/30.0) * j)
         estimate = estimate;
 
     else if (estimate > (1.0/3.0) * j)
