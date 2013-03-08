@@ -102,7 +102,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
         sum = sum + 1.0/pow(2, rank);
     }
 
-    const double j = (double) 0x7FFFFFFF; //TODO: change this
+    static const double j = 4294967296.0;
     double estimate = alpha * (1/sum) * self->size * self->size;
     
     if (estimate <= 2.5 * self->size) {
