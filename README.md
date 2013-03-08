@@ -1,5 +1,7 @@
 This is a python module, written in C, implementing the HyperLogLog algorithm using a Murmur3 hash function.
 
+v0.2
+
 ## Setup
 
     python setup build
