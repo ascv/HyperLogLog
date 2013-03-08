@@ -142,10 +142,10 @@ HyperLogLog_size(HyperLogLog* self)
 
 
 static PyMethodDef HyperLogLog_methods[] = {
-    {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS, //TODO: check for single arg macro
+    {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element to a random register."
     },
-    {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS, //TODO: check for single arg macro
+    {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
      "Get the cardinality."
     },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
