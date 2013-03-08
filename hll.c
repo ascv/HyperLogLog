@@ -102,7 +102,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
         sum = sum + 1.0/pow(2, rank);
     }
 
-    static const double j = 4294967296.0;
+    static const double two_32 = 4294967296.0;
+    static const double neg_two_32 = -4294967296.0;
     double estimate = alpha * (1/sum) * self->size * self->size;
     
     if (estimate <= 2.5 * self->size) {
@@ -118,11 +119,11 @@ HyperLogLog_cardinality(HyperLogLog *self)
             estimate = self->size * log(self->size/zeros);
     }
     
-    if (estimate <= (1.0/30.0) * j)
+    if (estimate <= (1.0/30.0) * two_32)
         estimate = estimate;
 
-    else if (estimate > (1.0/3.0) * j)
-        estimate = (-1.0 * j) * log(1.0 - estimate/j);
+    else if (estimate > (1.0/30.0) * two_32)
+        estimate = neg_two_32 * log(1.0 - estimate/two_32);
 
     return Py_BuildValue("d", estimate);
 }
