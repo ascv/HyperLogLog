@@ -1,9 +1,16 @@
-CFLAGS = -Wall -g -lm -o
-SRCS = hll.c loglog.c lib.c murmur3.c
+BUILD_PATH = /home/josh/hll/build/lib.linux-x86_64-2.7
 
 all:
-	gcc $(SRCS) $(CFLAGS) hll
+	python setup.py build
 
 clean:
-	rm loglog *o -f
+	sudo rm -rf ./build
+	sudo rm -f *~
+
+auto: all
+	cd /home/josh/hll/build/lib.linux-x86_64-2.7
+	python
+
+test:
+	sudo ./test.sh
 
