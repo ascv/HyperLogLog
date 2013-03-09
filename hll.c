@@ -26,8 +26,14 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     HyperLogLog *self;
     self = (HyperLogLog *)type->tp_alloc(type, 0);
 
-    if (!PyArg_ParseTuple(args, "i", &self->k))
+    if (!PyArg_ParseTuple(args, "i", &self->k)) {
         return NULL;
+    }
+    if (self->k < 2 || self->k > 16) {
+        char * msg = "Number of registers must be in the range [2^1, 2^16]";
+        PyErr_SetString(PyExc_ValueError, msg);
+	return NULL;
+    }
 
     self->size = 1 << self->k;
     self->registers = (char *)malloc(self->size * sizeof(char));
@@ -47,7 +53,7 @@ static PyMemberDef HyperLogLog_members[] = {
 };
 
 static PyObject *
-HyperLogLog_add(HyperLogLog *self, PyObject * args) 
+HyperLogLog_add(HyperLogLog *self, PyObject * args) // TODO: add seed argument
 {
     const char *data;
     const uint32_t dataLength;
@@ -60,7 +66,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject * args)
     uint32_t rank;
 
     //TODO: change 42 to random seed
-    MurmurHash3_x86_32((void *) data, dataLength, 42, (void *) hash);
+    MurmurHash3_x86_32((void *) data, dataLength, 4294, (void *) hash);
 
     // get the first k bits as an int
     index = *hash >> (32 - self->k);
@@ -69,7 +75,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject * args)
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
-      self->registers[index] = rank;
+        self->registers[index] = rank;
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -166,15 +172,15 @@ static PyTypeObject HyperLogLogType = {
     (destructor)HyperLogLog_dealloc, /*tp_dealloc*/
     0,                         /*tp_print*/
     0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
+    0,                         /*tp_setattr*/ 
+    0,                         /*tp_compare*/ // compare cardinality
     0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
+    0,                         /*tp_as_number*/ // return cardinality
     0,                         /*tp_as_sequence*/
     0,                         /*tp_as_mapping*/
     0,                         /*tp_hash */
     0,                         /*tp_call*/
-    0,                         /*tp_str*/
+    0,                         /*tp_str*/ // return registers
     0,                         /*tp_getattro*/
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
@@ -206,8 +212,7 @@ static PyMethodDef module_methods[] = {
 #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
 #endif
-PyMODINIT_FUNC
-initHLL(void) 
+PyMODINIT_FUNC initHLL(void) 
 {
     PyObject* m;
 
