@@ -1,4 +1,4 @@
-This is a python module implementing the HyperLogLog algorithm using a Murmur3 hash function. Requires CPython.
+This is a python module, written in C, implementing the HyperLogLog algorithm using a Murmur3 hash function.
 
 ## Setup
 
