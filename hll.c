@@ -8,9 +8,10 @@
 
 typedef struct {
     PyObject_HEAD
-    short int k;
-    uint32_t size; /* number of registers = 2^k */
-    char * registers;
+    short int k;      /* power parameter, size = 2^k */
+    uint32_t seed;    /* Murmur3 Hash seed value */
+    uint32_t size;    /* number of registers */
+    char * registers; /* array of ranks */
 
 } HyperLogLog;
 
@@ -21,27 +22,28 @@ HyperLogLog_dealloc(HyperLogLog* self)
 }
 
 static PyObject *
-HyperLogLog_new(PyTypeObject *type, PyObject *args)
+HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-  /*
-  static char *kwlist[] = {"power", "seed", NULL}; // TODO: add seed keyword
-  */
+  
+    static char *kwlist[] = {"k", "seed", NULL};
+  
     HyperLogLog *self;
     self = (HyperLogLog *)type->tp_alloc(type, 0);
-    /*
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|OOi", kwlist, 
-                                      &first, &last, 
-                                      &self->number))
-        return -1; 
-    */
-    if (!PyArg_ParseTuple(args, "i", &self->k)) {
-        return NULL;
+    self->seed = NULL;
+
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, 
+				      &self->k, &self->seed)) {
+        return NULL; 
     }
+
     if (self->k < 2 || self->k > 16) {
         char * msg = "Number of registers must be in the range [2^1, 2^16]";
         PyErr_SetString(PyExc_ValueError, msg);
 	return NULL;
-    }
+    } 
+
+    if (self->seed == NULL)
+        self->seed = 314;
 
     self->size = 1 << self->k;
     self->registers = (char *)malloc(self->size * sizeof(char));
@@ -73,12 +75,12 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     uint32_t index;
     uint32_t rank;
 
-    MurmurHash3_x86_32((void *) data, dataLength, 314, (void *) hash);
+    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
 
     /* use the first k bits + 1 as in index*/
     index = (*hash >> (32 - self->k)) + 1;
 
-    /* get the rank of the remaining 32-k bits */
+    /* get the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
