@@ -29,7 +29,7 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
   
     HyperLogLog *self;
     self = (HyperLogLog *)type->tp_alloc(type, 0);
-    self->seed = NULL;
+    self->seed = 314;
 
     if (! PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, 
 				      &self->k, &self->seed)) {
@@ -37,13 +37,10 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     if (self->k < 2 || self->k > 16) {
-        char * msg = "Number of registers must be in the range [2^1, 2^16]";
+        char * msg = "Number of registers must be in the range [2^2, 2^16]";
         PyErr_SetString(PyExc_ValueError, msg);
 	return NULL;
     } 
-
-    if (self->seed == NULL)
-        self->seed = 314;
 
     self->size = 1 << self->k;
     self->registers = (char *)malloc(self->size * sizeof(char));
@@ -156,7 +153,9 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
-    return Py_BuildValue("s#", self->registers, self->size);
+
+    PyObject* result = PyByteArray_FromStringAndSize(self->registers, self->size);
+    return result;
 }
 
 static PyObject *
@@ -249,7 +248,6 @@ PyMODINIT_FUNC initHLL(void)
     Py_INCREF(&HyperLogLogType);
     PyModule_AddObject(m, "HyperLogLog", (PyObject *)&HyperLogLogType);
 }
-
 
 
 /* 
