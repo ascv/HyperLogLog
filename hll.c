@@ -8,7 +8,7 @@
 
 typedef struct {
     PyObject_HEAD
-    short int k;      /* power parameter, size = 2^k */
+    short int k;      /* power, size = 2^k */
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
     char * registers; /* array of ranks */
@@ -55,10 +55,16 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     return 0; 
 }
 
+/*
+ * Instance members of type HyperLogLog.
+ */
 static PyMemberDef HyperLogLog_members[] = { 
     {NULL} /* Sentinel */
 };
 
+/*
+ * Adds an element to the cardinality estimator.
+ */
 static PyObject *
 HyperLogLog_add(HyperLogLog *self, PyObject *args)
 {
@@ -73,11 +79,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     uint32_t rank;
 
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
-
-    /* use the first k bits + 1 as in index*/
     index = (*hash >> (32 - self->k)) + 1;
-
-    /* get the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
@@ -87,6 +89,9 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     return Py_None;
 };
 
+/*
+ * Gets the cardinality estimate.
+ */
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
@@ -123,7 +128,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	uint32_t i;
 
 	for (i = 0; i < self->size; i++) {
-	    if (self->registers == 0)
+    	    if (self->registers == 0)
 	        zeros += 1;
 	}
 
@@ -138,26 +143,55 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
     return Py_BuildValue("d", estimate);
 }
+
 /*
+ * Merges another HyperLogLog with the current HyperLogLog by taking the maximum
+ * value for each register . The other HyperLogLog is unaffected by the merge.
+ * The HyperLogLogs must be equal in size else an exception is raised.
+ */
 static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args) 
 {
-    uint32_t i;
-    // verify size of other HLL works with current size
-    // get registers of other hyperloglog
-    // loop across current registers, comparing and setting
+  
+    PyObject *hll;
+    if (!PyArg_ParseTuple(args, "O", &hll)) //TODO: use O! to check type
+        return NULL;
 
-    return Py_BuildValue("s#", self->registers, self->size);
+    PyObject *size = PyObject_CallMethod(hll, "size", NULL);
+    long test = PyInt_AsLong(size);
+
+    if (test != self->size) {
+        PyErr_SetString(PyExc_ValueError, "HyperLogLogs must be the same size");
+        return NULL;
+    }
+
+    PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
+    char *hllRegisters = PyByteArray_AsString(hllByteArray);
+
+    uint32_t i;   
+    for (i = 0; i < self->size; i++) {
+        if (self->registers[i] < hllRegisters[i])
+	    self->registers[i] = hllRegisters[i];
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 } 
-*/
+
+
+/*
+ * Gets a copy of the registers as a bytesarray.
+ */
 static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
-
     PyObject* result = PyByteArray_FromStringAndSize(self->registers, self->size);
     return result;
 }
 
+/*
+ * Gets the number of registers.
+ */
 static PyObject *
 HyperLogLog_size(HyperLogLog* self)
 {
@@ -170,10 +204,10 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
      "Get the cardinality."
-    },/*
+    },
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
-     "Merge another HyperLogLog object with the current object."
-     },*/
+     "Merge another HyperLogLog object with the current HyperLogLog."
+     },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a string copy of the registers."
      },
