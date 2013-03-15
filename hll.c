@@ -18,6 +18,7 @@ typedef struct {
 static void
 HyperLogLog_dealloc(HyperLogLog* self)
 {
+    free(self->registers);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -146,8 +147,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
 /*
  * Merges another HyperLogLog with the current HyperLogLog by taking the maximum
- * value for each register . The other HyperLogLog is unaffected by the merge.
- * The HyperLogLogs must be equal in size else an exception is raised.
+ * value of each register. The registers of the other HyperLogLog are 
+ * unaffected.
  */
 static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args) 
@@ -174,6 +175,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 	    self->registers[i] = hllRegisters[i];
     }
 
+    free(hllRegisters);
     Py_INCREF(Py_None);
     return Py_None;
 } 
@@ -185,9 +187,52 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
-    PyObject* result = PyByteArray_FromStringAndSize(self->registers, self->size);
-    return result;
+    PyObject* registers;
+    registers = PyByteArray_FromStringAndSize(self->registers, self->size);
+    return registers;
 }
+
+/*
+ * Sets register at |index| to integer |rank|.
+ */
+static PyObject *
+HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
+{
+    const uint32_t index;
+    const char rank;
+
+    if (!PyArg_ParseTuple(args, "ii", &index, &rank))
+        return NULL;
+
+    if (index < 0) {
+        char * msg = "Index is negative.";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+
+    if (index > self->size) {
+        char * msg = "Index greater than the number of registers.";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+
+    if (rank > 32) {
+        char * msg = "Rank is greater than the maximum possible rank.";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+
+    if (rank < 0) {
+        char * msg = "Rank is negative.";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+
+    self->registers[index] = rank;
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 
 /*
  * Gets the number of registers.
