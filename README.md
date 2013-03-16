@@ -20,7 +20,7 @@ todo
     
 ## License
 
-This software is released under the [MIT License](https://gist.github.com/ascv/5123769)
+This software is released under the [MIT License](https://gist.github.com/ascv/5123769).
 
 ## References
 
