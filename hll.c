@@ -197,7 +197,7 @@ HyperLogLog_registers(HyperLogLog *self)
  * Sets register |index| to |rank|.
  */
 static PyObject *
-HyperLogLog_TT(HyperLogLog *self, PyObject * args)
+HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 {
     const uint32_t index;
     const uint32_t rank;
@@ -259,7 +259,7 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a string copy of the registers."
      },
-    {"TT", (PyCFunction)HyperLogLog_TT, METH_VARARGS, 
+    {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
      "Get a string copy of the registers."
      },
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
