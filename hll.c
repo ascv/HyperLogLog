@@ -146,6 +146,24 @@ HyperLogLog_cardinality(HyperLogLog *self)
 }
 
 /*
+ * Get a Murmur3 hash of |data| as an unsigned integer.
+ */
+static PyObject *
+HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
+{
+    const char *data;
+    const uint32_t dataLength;
+
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
+        return NULL;
+
+    uint32_t *hash = (uint32_t *) malloc(sizeof(uint32_t));
+    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
+    return Py_BuildValue("i", *hash);
+}
+
+
+/*
  * Merges another HyperLogLog with the current HyperLogLog by taking the maximum
  * value of each register. The registers of the other HyperLogLog are 
  * unaffected.
@@ -253,6 +271,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
      "Merge another HyperLogLog object with the current HyperLogLog."
+     },
+    {"murmur3_hash", (PyCFunction)HyperLogLog_murmur3_hash, METH_VARARGS,
+     "Gets a Murmur3 hash of the passed data."
      },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a string copy of the registers."
