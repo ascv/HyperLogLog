@@ -254,6 +254,15 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 }
 
 /*
+ * Gets the seed.
+ */
+static PyObject *
+HyperLogLog_seed(HyperLogLog* self)
+{
+    return Py_BuildValue("i", self->seed);
+}
+
+/*
  * Gets the number of registers.
  */
 static PyObject *
@@ -277,6 +286,9 @@ static PyMethodDef HyperLogLog_methods[] = {
      },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a string copy of the registers."
+     },
+    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS, 
+     "Get the seed used in the Murmur3 hash."
      },
     {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
      "Get a string copy of the registers."
