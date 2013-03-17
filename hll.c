@@ -12,7 +12,6 @@ typedef struct {
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
     char * registers; /* array of ranks */
-
 } HyperLogLog;
 
 static void
@@ -25,34 +24,31 @@ HyperLogLog_dealloc(HyperLogLog* self)
 static PyObject *
 HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-  
-    static char *kwlist[] = {"k", "seed", NULL};
-  
     HyperLogLog *self;
     self = (HyperLogLog *)type->tp_alloc(type, 0);
     self->seed = 314;
-
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, 
-				      &self->k, &self->seed)) {
-        return NULL; 
-    }
-
-    if (self->k < 2 || self->k > 16) {
-        char * msg = "Number of registers must be in the range [2^2, 2^16]";
-        PyErr_SetString(PyExc_ValueError, msg);
-	return NULL;
-    } 
-
-    self->size = 1 << self->k;
-    self->registers = (char *)malloc(self->size * sizeof(char));
-    memset(self->registers, 0, self->size);
-
     return (PyObject *)self;
 }
 
 static int
 HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 { 
+    static char *kwlist[] = {"k", "seed", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, 
+				      &self->k, &self->seed)) {
+        return -1; 
+    }
+
+    if (self->k < 2 || self->k > 16) {
+        char * msg = "Number of registers must be in the range [2^2, 2^16]";
+        PyErr_SetString(PyExc_ValueError, msg);
+	return -1;
+    } 
+
+    self->size = 1 << self->k;
+    self->registers = (char *)malloc(self->size * sizeof(char));
+    memset(self->registers, 0, self->size);
     return 0; 
 }
 
@@ -80,7 +76,11 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     uint32_t rank;
 
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
+
+    /* use the first k bits as an index */
     index = (*hash >> (32 - self->k)) + 1;
+
+    /* compute the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
@@ -169,7 +169,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
     char *hllRegisters = PyByteArray_AsString(hllByteArray);
 
-    uint32_t i;   
+    uint32_t i;
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] < hllRegisters[i])
 	    self->registers[i] = hllRegisters[i];
@@ -191,7 +191,6 @@ HyperLogLog_registers(HyperLogLog *self)
     registers = PyByteArray_FromStringAndSize(self->registers, self->size);
     return registers;
 }
-
 
 /*
  * Sets register |index| to |rank|.
@@ -235,7 +234,6 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
     return Py_None;
 
 }
-
 
 /*
  * Gets the number of registers.
