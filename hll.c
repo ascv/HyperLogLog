@@ -175,7 +175,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 	    self->registers[i] = hllRegisters[i];
     }
 
-    free(hllRegisters);
+    //free(hllRegisters);
     Py_INCREF(Py_None);
     return Py_None;
 } 
@@ -192,14 +192,15 @@ HyperLogLog_registers(HyperLogLog *self)
     return registers;
 }
 
+
 /*
- * Sets register at |index| to integer |rank|.
+ * Sets register |index| to |rank|.
  */
 static PyObject *
-HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
+HyperLogLog_TT(HyperLogLog *self, PyObject * args)
 {
     const uint32_t index;
-    const char rank;
+    const uint32_t rank;
 
     if (!PyArg_ParseTuple(args, "ii", &index, &rank))
         return NULL;
@@ -229,8 +230,10 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
     }
 
     self->registers[index] = rank;
+
     Py_INCREF(Py_None);
     return Py_None;
+
 }
 
 
@@ -254,6 +257,9 @@ static PyMethodDef HyperLogLog_methods[] = {
      "Merge another HyperLogLog object with the current HyperLogLog."
      },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
+     "Get a string copy of the registers."
+     },
+    {"TT", (PyCFunction)HyperLogLog_TT, METH_VARARGS, 
      "Get a string copy of the registers."
      },
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
