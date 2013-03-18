@@ -3,7 +3,6 @@
 #include "hll.h"
 #include "murmur3.h"
 #include <math.h>
-#include <ctype.h>
 #include <stdint.h>
 
 typedef struct {
@@ -18,7 +17,11 @@ static void
 HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
+#if PY_MAJOR_VERSION >= 3
+    Py_TYPE(self)->tp_free((PyObject*)self);
+#else
     self->ob_type->tp_free((PyObject*)self);
+#endif
 }
 
 static PyObject *
