@@ -308,8 +308,12 @@ static PyMethodDef HyperLogLog_methods[] = {
 };
 
 static PyTypeObject HyperLogLogType = {
+#if PY_MAJOR_VERSION >= 3
+    PyVarObject_HEAD_INIT(NULL, 0)
+#else
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
+#endif
     "HLL.HyperLogLog",         /*tp_name*/
     sizeof(HyperLogLog),       /*tp_basicsize*/
     0,                         /*tp_itemsize*/
@@ -328,7 +332,8 @@ static PyTypeObject HyperLogLogType = {
     0,                         /*tp_getattro*/
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | 
+        Py_TPFLAGS_BASETYPE, /*tp_flags*/
     "HyperLogLog object",      /* tp_doc */
     0,		               /* tp_traverse */
     0,		               /* tp_clear */
