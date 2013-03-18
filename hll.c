@@ -358,6 +358,16 @@ static PyMethodDef module_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef HyperLogLogmodule = {
+    PyModuleDef_HEAD_INIT,
+    "HyperLogLog",
+    "Example module that creates an extension type.",
+    -1,
+    NULL, NULL, NULL, NULL, NULL
+};
+#endif
+
 #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
 #endif
@@ -365,17 +375,35 @@ PyMODINIT_FUNC initHLL(void)
 {
     PyObject* m;
 
-    if (PyType_Ready(&HyperLogLogType) < 0)
-        return;
 
-    m = Py_InitModule3("HLL", module_methods,
-                       "HyperLogLog cardinality estimator.");
+    if (PyType_Ready(&HyperLogLogType) < 0) {
+
+#if PY_MAJOR_VERSION >= 3
+        return NULL;
+    }
+
+    m = PyModule_Create(&HyperLogLogmodule);
+#else
+        return;
+    }
+
+    char *description = "HyperLogLog cardinality estimator.";
+    m = Py_InitModule3("HLL", module_methods, description);
+#endif
 
     if (m == NULL)
-      return;
+#if PY_MAJOR_VERSION >= 3
+        return NULL;
+#else
+        return;
+#endif
 
     Py_INCREF(&HyperLogLogType);
     PyModule_AddObject(m, "HyperLogLog", (PyObject *)&HyperLogLogType);
+
+#if PY_MAJOR_VERSION >= 3
+    return m;
+#endif
 }
 
 
