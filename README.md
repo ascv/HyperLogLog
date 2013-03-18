@@ -1,9 +1,14 @@
-This is a python module, written in C, that defines the type HyperLogLog
-which implements the HyperLogLog algorithm using a Murmur3 hash function.
+The HyperLogLog algorithm provies a space efficient means to estimate the
+cardinality of extraordinarily large data sets. This module provides an
+implementation, written in C, for python 2.7.3 or python 3.x.
 
-v0.3
+v0.4
 
 ## Setup
+
+    pip install HLL
+
+or
 
     python setup build
 
@@ -14,7 +19,7 @@ v0.3
     hll = HyperLogLog(5) # use 2^5 registers
     hll.add('some data')
     estimate = hll.cardinality()
-    
+  
 ## Documentation
 
 ##### add(<i>data</i>)
@@ -23,8 +28,9 @@ Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or memo
 
 ##### HyperLogLog(<i>k [,seed])
 
-Create a new HyperLogLog using 2^<i>k</i> registers. Set <i>seed</i> to determine the seed
-value for the Murmur3 hash. The default value is 314.
+Create a new HyperLogLog using 2^<i>k</i> registers, <i>k</i> must be in the 
+range [2, 16]. Set <i>seed</i> to determine the seed value for the Murmur3 
+hash. The default value is 314.
 
 ##### merge(<i>HyperLogLog</i>)
 
@@ -54,6 +60,10 @@ Gets the number of registers.
 ##### set_register(<i>index, value</i>)
 
 Sets the register at <i>index</i> to <i>value</i>. Indexing is zero-based.
+
+## Theory
+
+TODO
     
 ## License
 
