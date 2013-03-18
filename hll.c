@@ -180,7 +180,10 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         return NULL;
 
     PyObject *size = PyObject_CallMethod(hll, "size", NULL);
-    long test = PyInt_AsLong(size);
+
+
+
+    long test = PyInt_AS_LONG(size);
 
     if (test != self->size) {
         PyErr_SetString(PyExc_ValueError, "HyperLogLogs must be the same size");
