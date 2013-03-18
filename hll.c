@@ -358,7 +358,7 @@ static PyTypeObject HyperLogLogType = {
 static PyModuleDef HyperLogLogmodule = {
     PyModuleDef_HEAD_INIT,
     "HyperLogLog",
-    "Example module that creates an extension type.",
+    "A space efficient cardinality estimator.",
     -1,
     NULL, NULL, NULL, NULL, NULL
 };
