@@ -6,10 +6,6 @@ v0.4
 
 ## Setup
 
-    pip install HLL
-
-or
-
     python setup build
 
 ## Quick start
