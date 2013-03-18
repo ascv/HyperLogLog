@@ -354,10 +354,6 @@ static PyTypeObject HyperLogLogType = {
     HyperLogLog_new,           /* tp_new */
 };
 
-static PyMethodDef module_methods[] = {
-    {NULL}  /* Sentinel */
-};
-
 #if PY_MAJOR_VERSION >= 3
 static PyModuleDef HyperLogLogmodule = {
     PyModuleDef_HEAD_INIT,
@@ -365,6 +361,11 @@ static PyModuleDef HyperLogLogmodule = {
     "Example module that creates an extension type.",
     -1,
     NULL, NULL, NULL, NULL, NULL
+};
+
+#else
+static PyMethodDef module_methods[] = {
+    {NULL}  /* Sentinel */
 };
 #endif
 
@@ -374,8 +375,6 @@ static PyModuleDef HyperLogLogmodule = {
 PyMODINIT_FUNC initHLL(void) 
 {
     PyObject* m;
-
-
     if (PyType_Ready(&HyperLogLogType) < 0) {
 
 #if PY_MAJOR_VERSION >= 3
