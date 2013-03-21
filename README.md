@@ -156,12 +156,12 @@ Notice that the expectation of 2^R is infinite so 2^R cannot used to estimate n.
 Furthermore using only a single observable can be misleading, so rather than 
 take the maximum rank amongst all the elements of M, HLL divides M into m buckets, 
 takes the maximum rank of each bucket and then averages the results, 
-using a harmonic mean, to compute the cardinality estimate. The "raw HLL" 
+(using a harmonic mean) to compute the cardinality estimate. The "raw HLL" 
 algorithm, which omits small and large range correction heuristics
-for the sake of brevity, is given by the following pseudocode:
+and is used here for the sake of brevity, is given by the following pseudocode:
 
 ```
-Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to the 32-bit words
+Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to 32-bit words
 Let p(s) be the position of the leftmost 1-bit of s; // e.g. p(001...) = 3, p(0^k) = k + 1
 Define a_16 = .673, a_32 = .697, a_64 = .709; a_m = .7213/(1 + 1.079/m) for m >= 128;
 
