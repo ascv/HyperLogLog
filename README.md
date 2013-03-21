@@ -1,6 +1,7 @@
 The HyperLogLog algorithm [1] provides a space efficient means to estimate the
 cardinality of extraordinarily large data sets. This module provides an
-implementation, written in C, for python 2.7.3 or python 3.x.
+implementation, written in C, for python 2.7.3 or python 3.x. See 
+<a href="#theory">Theory</a> for an introduction to the algorithm.
 
 v0.6
 
@@ -18,16 +19,18 @@ v0.6
   
 ## Documentation
 
-##### add(<i>data</i>)
-
-Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or 
-memoryview.
-
 ##### HyperLogLog(<i>k [,seed])
 
 Create a new HyperLogLog using 2^<i>k</i> registers, <i>k</i> must be in the 
 range [2, 16]. Set <i>seed</i> to determine the seed value for the Murmur3 
 hash. The default value is 314.
+
+* * *
+
+##### add(<i>data</i>)
+
+Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or 
+memoryview.
 
 ##### merge(<i>HyperLogLog</i>)
 
@@ -58,7 +61,7 @@ Gets the number of registers.
 
 Sets the register at <i>index</i> to <i>value</i>. Indexing is zero-based.
 
-## Theory
+## Theory <a name='theory'></a>
 
 This section is intended to provide a description of the HyperLogLog algorithm,
 denoted HLL, and the intuition behind why it works. Before considering HLL, it 
@@ -158,7 +161,7 @@ algorithm, which omits small and large range correction heuristics
 for the sake of brevity, is given by the following pseudocode:
 
 ```
-Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to the binary 32-bit words
+Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to the 32-bit words
 Let p(s) be the position of the leftmost 1-bit of s; // e.g. p(001...) = 3, p(0^k) = k + 1
 Define a_16 = .673, a_32 = .697, a_64 = .709; a_m = .7213/(1 + 1.079/m) for m >= 128;
 
