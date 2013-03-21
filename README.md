@@ -155,7 +155,7 @@ a rough estimation of log_2(n) where n is the true cardinality of the set.
 Notice that the expectation of 2^R is infinite so 2^R cannot used to estimate n. 
 Furthermore using only a single observable can be misleading, so rather than 
 take the maximum rank amongst all the elements of M, HLL divides M into m buckets, 
-takes the maximum rank of each bucket and then averages the results, 
+takes the maximum rank of each bucket and then averages the results 
 (using a harmonic mean) to compute the cardinality estimate. The "raw HLL" 
 algorithm, which omits small and large range correction heuristics
 and is used here for the sake of brevity, is given by the following pseudocode:
