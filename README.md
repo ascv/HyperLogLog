@@ -76,21 +76,19 @@ are 100 billion hashes occupying 8 * 10^11 bytes or approximately 754 GB. For
 practical purposes this space requirement is prohibitively inefficient. 
 
 A more sophisticated approach might utilize linear counting, where each hash 
-instead determines the location of some bit in a vector of zero bits. This 
-bit is set to 1 and after all the elements have been hashed and their associated 
-bits set to 1 the cardinality can then be computed by simply counting the number 
-of 1 bits in the vector. The space requirement is then the number of bits in the 
-bit vector. Using the previous example, this would require 100 billion bits or 
-approximately 12 GB. This space requirement is still prohibitive for many 
-applications. 
+instead determines the location of some bit in a vector of zero bits. The bit
+at this location is set to 1. After all the elements have been hashed and their 
+associated bits set to 1 the cardinality can then be computed by simply counting 
+the number of 1 bits in the vector. The space requirement is then the number of 
+bits in the bit vector. Using the previous example, this would require 100 
+billion bits or approximately 12 GB. This space requirement is still prohibitive 
+for many applications. 
 
 HLL relies on making observations in the underlying bit-patterns of the elements 
 in the dataset whose cardinality we wish to estimate. As an explanatory example, 
-we will consider an 8-bit case.
-
-Suppose h(x) is a hash function that randomly distributes the bits
-of x with equal probability. Then a hashed element might have the 
-following distribution of bits:
+we will consider an 8-bit case. Suppose h(x) is a hash function that randomly 
+distributes the bits of x with equal probability. Then a hashed element might 
+have the following distribution of bits:
   
 |  0  | 0  | 0  | 0  | 1  | 1  | 0  | 1  |
 | --- |:--:|:--:|:--:|:--:|:--:|:--:| --:|
