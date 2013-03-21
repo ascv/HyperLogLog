@@ -155,7 +155,7 @@ Furthermore using only a single observable can be misleading, so rather than
 take the maximum rank amongst all the elements of M, HLL divides M into m buckets, 
 takes the maximum rank of each bucket and then averages the results 
 (using a harmonic mean) to compute the cardinality estimate. The "raw HLL" 
-algorithm, which omits small and large range correction heuristics
+algorithm, omitting small and large range correction heuristics
 and is used here for the sake of brevity, is given by the following pseudocode:
 
 ```
