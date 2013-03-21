@@ -88,8 +88,8 @@ HLL relies on making observations in the underlying bit-patterns of the elements
 in the dataset whose cardinality we wish to estimate. As an explanatory example, 
 we will consider an 8-bit case.
 
-Suppose <b>h(<i>x</i>)</b> is a hash function that randomly distributes the bits
-of <i>x</i> with equal probability. Then a hashed element might have the 
+Suppose h(x) is a hash function that randomly distributes the bits
+of x with equal probability. Then a hashed element might have the 
 following distribution of bits:
   
 |  0  | 0  | 0  | 0  | 1  | 1  | 0  | 1  |
