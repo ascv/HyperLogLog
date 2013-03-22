@@ -13,7 +13,7 @@ v0.3
     
     hll = HyperLogLog(5) # use 2^5 registers
     hll.add('some data')
-    print hll.cardinality()
+    estimate = hll.cardinality()
     
 ## Documentation
 
