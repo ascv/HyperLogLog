@@ -11,7 +11,7 @@ v0.3
 
     from HLL import HyperLogLog
     
-    hll = HyperLogLog(5) # create a counter with 2^5 registers
+    hll = HyperLogLog(5) # use 2^5 registers
     hll.add('some data')
     print hll.cardinality()
     
