@@ -126,8 +126,9 @@ HyperLogLog_cardinality(HyperLogLog *self)
         sum = sum + 1.0/pow(2, rank);
     }
 
-    double estimate = alpha * (1/sum) * self->size * self->size;    
-    if (estimate <= 2.5 * self->size) {
+    double raw_estimate = alpha * (1/sum) * self->size * self->size;   
+    double estimate = 0;   
+    if (raw_estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
 	uint32_t i;
 
@@ -138,12 +139,15 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
         if (zeros != 0)
             estimate = self->size * log(self->size/zeros);
+	else
+            estimate = raw_estimate;
     }
     
     if (estimate <= (1.0/30.0) * two_32)
-        estimate = estimate;
-    else if (estimate > (1.0/30.0) * two_32)
-        estimate = neg_two_32 * log(1.0 - estimate/two_32);
+        estimate = raw_estimate;
+    
+    if (estimate > (1.0/30.0) * two_32)
+        estimate = neg_two_32 * log(1.0 - raw_estimate/two_32);
 
     return Py_BuildValue("d", estimate);
 }
