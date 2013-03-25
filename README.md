@@ -1,8 +1,8 @@
-The HyperLogLog algorithm provides a space efficient means to estimate the
+The HyperLogLog algorithm [1] provides a space efficient means to estimate the
 cardinality of extraordinarily large data sets. This module provides an
 implementation, written in C, for python 2.7.3 or python 3.x.
 
-v0.4
+v0.6
 
 ## Setup
 
@@ -56,10 +56,6 @@ Gets the number of registers.
 ##### set_register(<i>index, value</i>)
 
 Sets the register at <i>index</i> to <i>value</i>. Indexing is zero-based.
-
-## Theory
-
-TODO
     
 ## License
 
