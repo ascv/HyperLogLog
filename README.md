@@ -200,11 +200,6 @@ Algorithm HYPERLOGLOG(input M: a multiset of items from domain D)
 		set E* := 2^32 * log(1 - E/2^32)
 	
 	return cardinality estimate E* with typical relative error +/- 1.04/m^(1/2)
-			
-	
-	
-	
-	
 ```
     
 ## License
