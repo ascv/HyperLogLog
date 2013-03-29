@@ -148,15 +148,21 @@ rank k. Moreover,
     log_2(n) ~ k + log2(r)
 	
 In other words, if M contains the hashed elements of a multi-set of unknown 
-cardinality and R is the maximum rank amongst these elements, then R provides 
-a rough estimation of log_2(n) where n is the true cardinality of the set. 
+cardinality, n is the true cardinality of M, and R is the maximum rank amongst the 
+elements of M, then R provides a rough estimation of log_2(n) with some additive bias. 
 Notice that the expectation of 2^R is infinite so 2^R cannot used to estimate n. 
-Furthermore using only a single observable can be misleading, so rather than 
-take the maximum rank amongst all the elements of M, HLL divides M into m buckets, 
-takes the maximum rank of each bucket and then averages the results 
-(using a harmonic mean) to compute the cardinality estimate. The "raw HLL" 
-algorithm, omitting small and large range correction heuristics
-and is used here for the sake of brevity, is given by the following pseudocode:
+
+Furthermore using only a single observable can be misleading. For example, suppose 
+all the elements of M have the same hash. This implies that these elements are
+probably not distinct. However the rank of these elements may be very large so
+using the expression for log_2(n) would produce wildly inaccurate results.
+
+Rather than take the maximum rank amongst all the elements of M, HLL divides M 
+into m buckets, takes the maximum rank of each bucket. It follows that for each 
+bucket, we have an estimate of log_2(n/m). These results are averaged using 
+a harmonic mean and then multiplied by a constant to reduce bias (see [1] 
+for discussion of the constant). The HLL algorithm is given by the 
+following pseudocode:
 
 ```
 Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to 32-bit words
@@ -173,13 +179,32 @@ Algorithm HYPERLOGLOG(input M: a multiset of items from domain D)
 		set w := <x_b+1 x_b+2 ... >; // the remaining bits of x
 		set M[j] := max(M[j], p[w]);
 		
-	Z = 0;
-	for j = 1 to m do
+	Z := 0;
+	for j := 1 to m do
 	     Z := Z + 2^-M[j];
 	
-	Z = 1/Z;
+	Z := 1/Z;
+	E := a_m * m^2 * Z; // raw HLL estimate
 	
-	return E := alpha_m * m^2 * Z;
+	if E <= 5/2 * m then
+		let V be the number of registers equal to 0;
+		if V != 0 then 
+			set E* := m*log(m/V)
+		else 
+			set E* := E
+			
+	if E < 1/30 * 2^32 then
+		set E* := E
+	
+	if E > 1/30 * 2^32 then
+		set E* := 2^32 * log(1 - E/2^32)
+	
+	return cardinality estimate E* with typical relative error +/- 1.04/m^(1/2)
+			
+	
+	
+	
+	
 ```
     
 ## License
