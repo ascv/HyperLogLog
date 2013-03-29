@@ -53,13 +53,13 @@ Gets a bytearray of the registers.
 
 Gets the seed value used in the Murmur3 hash.
 
-##### size()
-
-Gets the number of registers.
-
 ##### set_register(<i>index, value</i>)
 
 Sets the register at <i>index</i> to <i>value</i>. Indexing is zero-based.
+
+##### size()
+
+Gets the number of registers.
 
 ## Theory <a name='theory'></a>
 
