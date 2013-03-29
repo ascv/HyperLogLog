@@ -188,16 +188,13 @@ Algorithm HYPERLOGLOG(input M: a multiset of items from domain D)
 	
 	if E <= 5/2 * m then
 		let V be the number of registers equal to 0;
-		if V != 0 then 
-			set E* := m*log(m/V)
-		else 
-			set E* := E
+		if V != 0 then set E* := m*log(m/V) else set E* := E // small range correction
 			
 	if E < 1/30 * 2^32 then
-		set E* := E
+		set E* := E // intermediate range - no correction
 	
 	if E > 1/30 * 2^32 then
-		set E* := 2^32 * log(1 - E/2^32)
+		set E* := -2^32 * log(1 - E/2^32) // large range correction
 	
 	return cardinality estimate E* with typical relative error +/- 1.04/m^(1/2)
 ```
