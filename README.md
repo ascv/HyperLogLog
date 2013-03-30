@@ -158,7 +158,7 @@ probably not distinct. However the rank of these elements may be very large so
 using the expression for log_2(n) would produce wildly inaccurate results.
 
 Rather than take the maximum rank amongst all the elements of M, HLL divides M 
-into m buckets, takes the maximum rank of each bucket. It follows that for each 
+into m buckets and takes the maximum rank of each bucket. Then for each 
 bucket, we have an estimate of log_2(n/m). These results are averaged using 
 a harmonic mean and then multiplied by a constant to reduce bias (see [1] 
 for discussion of the constant). The HLL algorithm is given by the 
