@@ -145,24 +145,23 @@ rank k. Moreover,
 	
     n ~  r * 2^k
 	
-    log_2(n) ~ k + log2(r)
+    log_2(n) ~ k + log2(r)            
 	
 In other words, if M contains the hashed elements of a multi-set of unknown 
 cardinality, n is the true cardinality of M, and R is the maximum rank amongst the 
 elements of M, then R provides a rough estimation of log_2(n) with some additive bias. 
 Notice that the expectation of 2^R is infinite so 2^R cannot used to estimate n. 
 
-Furthermore using only a single observable can be misleading. For example, suppose 
-all the elements of M have the same hash. This implies that these elements are
-probably not distinct. However the rank of these elements may be very large so
-using the expression for log_2(n) would produce wildly inaccurate results.
+Furthermore using only a single observable introduces inaccuracy into the results. For 
+example, suppose all the elements of M have the same hash. This implies that these 
+elements are probably not distinct. However the rank of these elements may be very 
+large so the cardinality estimate will also be large even though the true cardinality
+is very small.
 
-Rather than take the maximum rank amongst all the elements of M, HLL divides M 
-into m buckets and takes the maximum rank of each bucket. Then for each 
-bucket, we have an estimate of log_2(n/m). These results are averaged using 
-a harmonic mean and then multiplied by a constant to reduce bias (see [1] 
-for discussion of the constant). The HLL algorithm is given by the 
-following pseudocode:
+For this reason, HLL divides M into m buckets and takes the maximum rank of each 
+bucket. Then for each bucket, we have an estimate of log_2(n/m). These results 
+are averaged using a harmonic mean and then multiplied by a bias-reducing constant [1]. 
+The HLL algorithm is given by the following pseudocode:
 
 ```
 Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to 32-bit words
