@@ -133,6 +133,7 @@ the rank 5 numbers are given below:
     00001011
     00001100
     00001101
+    00001110
     00001111
 
 More generally, if there are n distinct elements and r is the number of elements 
