@@ -86,11 +86,11 @@ bits in the bit vector. Using the previous example, this would require 100
 billion bits or approximately 12 GB. This space requirement is still prohibitive 
 for many applications. 
 
-HLL relies on making observations in the underlying bit-patterns of the elements 
-in the dataset whose cardinality we wish to estimate. As an explanatory example, 
-we will consider an 8-bit case. Suppose h(x) is a hash function that randomly 
-distributes the bits of x with equal probability. Then a hashed element might 
-have the following distribution of bits:
+HLL relies on making observations in the underlying bit-patterns of the 
+hashed elements As an explanatory example, we will consider an 8-bit case. 
+Suppose h(x) is a hash function that randomly distributes the bits of x 
+with equal probability. Then a hashed element might have the following 
+distribution of bits:
   
 |  0  | 0  | 0  | 0  | 1  | 1  | 0  | 1  |
 | --- |:--:|:--:|:--:|:--:|:--:|:--:| --:|
