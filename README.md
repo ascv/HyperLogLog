@@ -69,7 +69,7 @@ consider the following problem...
 
 Suppose we have some multi-set (a set that contains 
 duplicate elements) whose cardinality we wish to know. Furthermore,
-suppose the memory occpued by this set is on the order of TB or PB of size. To recover
+suppose the memory occupied by this set is on the order of TB or PB of size. To recover
 the cardinality using a naive approach
 we could scan the elements and hash them, storing each hash in memory or on disk.
 The number of unique hashes is then the cardinality of the set. If the size of 
