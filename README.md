@@ -53,22 +53,24 @@ Gets a bytearray of the registers.
 
 Gets the seed value used in the Murmur3 hash.
 
-##### size()
-
-Gets the number of registers.
-
 ##### set_register(<i>index, value</i>)
 
 Sets the register at <i>index</i> to <i>value</i>. Indexing is zero-based.
 
+##### size()
+
+Gets the number of registers.
+
 ## Theory <a name='theory'></a>
 
 This section is intended to provide a description of the HyperLogLog algorithm,
-denoted HLL, and the intuition behind why it works. Before considering HLL, it 
-is important to motivate the purpose of the algorithm by considering the problem 
-it is designed to solve. Suppose we have some multi-set (a set that contains 
-duplicate elements) whose data size is on the order of TB or PB. Furthermore,
-suppose we wanted to estimate the cardinality of this set. Using a naive approach
+denoted HLL, and the intuition behind why it works. To motivate the discussion 
+consider the following problem... 
+
+Suppose we have some multi-set (a set that contains 
+duplicate elements) whose cardinality we wish to know. Furthermore,
+suppose the memory occupied by this set is on the order of TB or PB of size. To recover
+the cardinality using a naive approach
 we could scan the elements and hash them, storing each hash in memory or on disk.
 The number of unique hashes is then the cardinality of the set. If the size of 
 each hash is 8 bytes and the cardinality of set is 100 billion, then there
@@ -84,11 +86,11 @@ bits in the bit vector. Using the previous example, this would require 100
 billion bits or approximately 12 GB. This space requirement is still prohibitive 
 for many applications. 
 
-HLL relies on making observations in the underlying bit-patterns of the elements 
-in the dataset whose cardinality we wish to estimate. As an explanatory example, 
-we will consider an 8-bit case. Suppose h(x) is a hash function that randomly 
-distributes the bits of x with equal probability. Then a hashed element might 
-have the following distribution of bits:
+HLL relies on making observations in the underlying bit-patterns of the 
+hashed elements As an explanatory example, we will consider an 8-bit case. 
+Suppose h(x) is a hash function that randomly distributes the bits of x 
+with equal probability. Then a hashed element might have the following 
+distribution of bits:
   
 |  0  | 0  | 0  | 0  | 1  | 1  | 0  | 1  |
 | --- |:--:|:--:|:--:|:--:|:--:|:--:| --:|
@@ -133,6 +135,7 @@ the rank 5 numbers are given below:
     00001011
     00001100
     00001101
+    00001110
     00001111
 
 More generally, if there are n distinct elements and r is the number of elements 
@@ -145,24 +148,23 @@ rank k. Moreover,
 	
     n ~  r * 2^k
 	
-    log_2(n) ~ k + log2(r)
+    log_2(n) ~ k + log2(r)            
 	
 In other words, if M contains the hashed elements of a multi-set of unknown 
 cardinality, n is the true cardinality of M, and R is the maximum rank amongst the 
 elements of M, then R provides a rough estimation of log_2(n) with some additive bias. 
 Notice that the expectation of 2^R is infinite so 2^R cannot used to estimate n. 
 
-Furthermore using only a single observable can be misleading. For example, suppose 
-all the elements of M have the same hash. This implies that these elements are
-probably not distinct. However the rank of these elements may be very large so
-using the expression for log_2(n) would produce wildly inaccurate results.
+Furthermore using only a single observable introduces inaccuracy into the results. For 
+example, suppose all the elements of M have the same hash. This implies that these 
+elements are probably not distinct. However the rank of these elements may be very 
+large so the cardinality estimate will also be large even though the true cardinality
+is very small.
 
-Rather than take the maximum rank amongst all the elements of M, HLL divides M 
-into m buckets, takes the maximum rank of each bucket. It follows that for each 
-bucket, we have an estimate of log_2(n/m). These results are averaged using 
-a harmonic mean and then multiplied by a constant to reduce bias (see [1] 
-for discussion of the constant). The HLL algorithm is given by the 
-following pseudocode:
+For this reason, HLL divides M into m buckets and takes the maximum rank of each 
+bucket. Then for each bucket, we have an estimate of log_2(n/m). These results 
+are averaged using a harmonic mean and then multiplied by a bias-reducing constant [1]. 
+The HLL algorithm is given by the following pseudocode:
 
 ```
 Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to 32-bit words
