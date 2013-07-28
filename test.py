@@ -3,9 +3,9 @@ import unittest
 
 class TestRegisterFunctions(unittest.TestCase):
 
-    def setUp():
+    def setUp(self):
 	self.k = 5
-	self.hll = HyperLopLog(5)
+	self.hll = HyperLogLog(5)
 
     def test_set_last_register(self):
 	self.hll.set_register(self.k - 1, 1)
@@ -41,7 +41,7 @@ class TestCardinalityEstimation(unittest.TestCase):
     def test_the_larger_rank_is_used_when_comparing_elements(self):
         """ """
 
-class TestHyperLogLogConstructor(self):
+class TestHyperLogLogConstructor(unittest.TestCase):
 
     def setUp(self):
 	""" """
@@ -65,7 +65,7 @@ class TestHyperLogLogConstructor(self):
     def test_seed_can_be_set(self):
         """ """
 
-class TestMerging(self):
+class TestMerging(unittest.TestCase):
 
     def setUp(self):
 	""" """
