@@ -64,15 +64,15 @@ Gets the number of registers.
 ## Theory <a name='theory'></a>
 
 This section is intended to provide a description of the HyperLogLog algorithm,
-denoted HLL, and the intuition behind why it works. To motivate the discussion 
-consider the following problem... 
+denoted HLL, and some intuition as to why it works. It is not a derivation of
+the algorithm. To motivate the discussion consider the following problem... 
 
 Suppose we have some multi-set (a set that contains 
 duplicate elements) whose cardinality we wish to know. Furthermore,
 suppose the memory occupied by this set is on the order of TB or PB of size. To recover
 the cardinality using a naive approach
 we could scan the elements and hash them, storing each hash in memory or on disk.
-The number of unique hashes is then the cardinality of the set. If the size of 
+The cardinality of the set is then the number of unique hashes. If the size of 
 each hash is 8 bytes and the cardinality of set is 100 billion, then there
 are 100 billion hashes occupying 8 * 10^11 bytes or approximately 754 GB. For 
 practical purposes this space requirement is prohibitively inefficient. 
