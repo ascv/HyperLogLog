@@ -297,13 +297,13 @@ static PyMethodDef HyperLogLog_methods[] = {
      "Gets a Murmur3 hash of the passed data."
      },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
-     "Get a string copy of the registers."
+     "Get a copy of the registers as a bytearray."
      },
     {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS, 
      "Get the seed used in the Murmur3 hash."
      },
     {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
-     "Get a string copy of the registers."
+     "Set the register at a zero-based index to the specified rank." 
      },
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
      "Returns the number of registers."
