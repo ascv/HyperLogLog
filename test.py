@@ -16,7 +16,7 @@ class TestRegisterFunctions(unittest.TestCase):
 	self.assertTrue(self.hll.registers()[0] == 1)
 
     def test_registers_returns_bytesarray(self):
-	self.assertTrue(self.hll.registers() is bytearray)
+	self.assertTrue(type(self.hll.registers()) is bytearray)
 
     def test_registesr_returns_correct_length_bytes_array(self):
 	self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
