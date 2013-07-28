@@ -9,17 +9,17 @@ class TestRegisterFunctions(unittest.TestCase):
 
     def test_set_last_register(self):
 	self.hll.set_register(self.k - 1, 1)
-	self.assertTrue(self.registers()[self.k - 1] == 1)
+	self.assertTrue(self.hll.registers()[self.k - 1] == 1)
 
     def test_set_first_register(self):
 	self.hll.set_register(0, 1)
-	self.assertTrue(self.registers()[0] == 1)
+	self.assertTrue(self.hll.registers()[0] == 1)
 
     def test_registers_returns_bytesarray(self):
-	self.assertTrue(self.registers() is bytesarray)
+	self.assertTrue(self.hll.registers() is bytesarray)
 
     def test_registesr_returns_correct_length_bytes_array(self):
-	self.assertTrue(len(self.registers()) == pow(2, self.k))
+	self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
 
