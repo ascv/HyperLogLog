@@ -3,20 +3,23 @@ import unittest
 
 class TestRegisterFunctions(unittest.TestCase):
 
-    def setUp(self):
-        self.seq = list(range(10))
+    def setUp():
+	self.k = 5
+	self.hll = HyperLopLog(5)
 
     def test_set_last_register(self):
-	""" """
+	self.hll.set_register(self.k - 1, 1)
+	self.assertTrue(self.registers()[self.k - 1] == 1)
 
     def test_set_first_register(self):
-	""" """
+	self.hll.set_register(0, 1)
+	self.assertTrue(self.registers()[0] == 1)
 
-    def test_get_register_as_bytes_array(self):
-	""" """
+    def test_registers_returns_bytesarray(self):
+	self.assertTrue(self.registers() is bytesarray)
 
-    def test_get_number_of_registers(self):
-        """ """
+    def test_registesr_returns_correct_length_bytes_array(self):
+	self.assertTrue(len(self.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
 
