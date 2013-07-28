@@ -18,7 +18,7 @@ class TestRegisterFunctions(unittest.TestCase):
     def test_registers_returns_bytesarray(self):
         self.assertTrue(type(self.hll.registers()) is bytearray)
 
-    def test_registesr_returns_correct_length_bytes_array(self):
+    def test_registesr_returns_correct_length_bytearray(self):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
