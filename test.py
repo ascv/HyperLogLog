@@ -77,7 +77,9 @@ class TestHyperLogLogConstructor(unittest.TestCase):
             self.assertEqual(register, 0)
 
     def test_size_param_correctly_determines_the_number_of_registers(self):
-        """ """
+        hll = HyperLogLog(5)
+        self.assertEqual(len(hll.registers()), 32)
+
 
     def test_seed_can_be_set(self):
         """ """
