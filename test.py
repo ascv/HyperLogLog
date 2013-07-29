@@ -47,17 +47,29 @@ class TestHyperLogLogConstructor(unittest.TestCase):
         """ """
 
     def test_one_is_invalid_size(self):
-        self.assertRaises(Exception, HyperLogLog(0))
+        with self.assertRaises(ValueError):
+            HyperLogLog(0)
 
     def test_negative_size_is_invalid(self):
-        self.assertRaises(Exception, HyperLogLog(-1))
+        with self.assertRaises(ValueError):
+            HyperLogLog(-1)
 
-    def test_size_2_is_valid(self):
+    def test_minimum_size_is_valid(self):
         try:
-            hll = HyperLogLog(1)
-        catch Exception:
-            self.fail()       
-
+            HyperLogLog(2)
+        except Exception:
+            self.fail()
+    
+    def test_maximum_size_is_valid(self):
+        try:
+            HyperLogLog(16)
+        except Exception:
+            self.fail()
+    
+    def test_greater_than_the_maximum_size_is_invalid(self):
+        with self.assertRaises(ValueError):
+            HyperLogLog(17)           
+                 
     def test_all_registers_initialized_to_zero(self):
         """ """
 
