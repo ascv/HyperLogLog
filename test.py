@@ -76,12 +76,12 @@ class TestHyperLogLogConstructor(unittest.TestCase):
         for register in registers:
             self.assertEqual(register, 0)
 
-    def test_size_param_correctly_determines_the_number_of_registers(self):
+    def test_k_param_correctly_determines_the_number_of_registers(self):
         hll = HyperLogLog(5)
         self.assertEqual(len(hll.registers()), 32)
+        self.assertEqual(hll.size(), 32)
 
-
-    def test_seed_can_be_set(self):
+    def test_seed_parameter_actually_sets_seed(self):
         """ """
 
 class TestMerging(unittest.TestCase):
