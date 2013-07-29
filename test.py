@@ -71,7 +71,10 @@ class TestHyperLogLogConstructor(unittest.TestCase):
             HyperLogLog(17)           
                  
     def test_all_registers_initialized_to_zero(self):
-        """ """
+        hll = HyperLogLog(5)
+        registers = hll.registers()
+        for register in registers:
+            self.assertEqual(register, 0)
 
     def test_size_param_correctly_determines_the_number_of_registers(self):
         """ """
