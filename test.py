@@ -43,9 +43,6 @@ class TestCardinalityEstimation(unittest.TestCase):
 
 class TestHyperLogLogConstructor(unittest.TestCase):
 
-    def setUp(self):
-        """ """
-
     def test_one_is_invalid_size(self):
         with self.assertRaises(ValueError):
             HyperLogLog(0)
@@ -81,13 +78,11 @@ class TestHyperLogLogConstructor(unittest.TestCase):
         self.assertEqual(len(hll.registers()), 32)
         self.assertEqual(hll.size(), 32)
 
-    def test_seed_parameter_actually_sets_seed(self):
-        """ """
+    def test_seed_parameter_sets_seed(self):
+        hll = HyperLogLog(5, seed=4)
+        self.assertEqual(4, 4)
 
 class TestMerging(unittest.TestCase):
-
-    def setUp(self):
-        """ """
 
     def test_only_same_size_HyperLogLogs_can_be_merged(self):
         """ """
