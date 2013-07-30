@@ -15,6 +15,18 @@ class TestRegisterFunctions(unittest.TestCase):
         self.hll.set_register(0, 1)
         self.assertTrue(self.hll.registers()[0] == 1)
 
+    def test_set_register_with_negative_value_fails(self):
+        """ """
+
+    def test_set_register_with_greater_than_max_rank_fails(self):
+        """ """
+
+    def test_set_register_with_index_greater_than_size_fails(self):
+        """ """
+
+    def test_set_register_with_negative_index_fails(self):
+        """ """
+
     def test_registers_returns_bytesarray(self):
         self.assertTrue(type(self.hll.registers()) is bytearray)
 
@@ -85,8 +97,11 @@ class TestHyperLogLogConstructor(unittest.TestCase):
 class TestMerging(unittest.TestCase):
 
     def test_only_same_size_HyperLogLogs_can_be_merged(self):
-        """ """
-
+        hll = HyperLogLog(4)
+        hll = HyperLogLog(5)
+        self.assert
+    
+    
     def test_merge(self):
         """ """
 
