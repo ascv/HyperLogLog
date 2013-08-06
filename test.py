@@ -101,42 +101,24 @@ class TestMerging(unittest.TestCase):
 
     def test_only_same_size_HyperLogLogs_can_be_merged(self):
         hll = HyperLogLog(4)
-        hll = HyperLogLog(5)
-        self.assertRaises(
-    
+        hll2 = HyperLogLog(5)
+        with self.assertRaises(ValueError):
+            hll.merge(hll2)
+             
     def test_merge(self):
-        """ """
+        expected = bytearray(4)
+        expected[0] = 1
+        expected[3] = 1
+
+        hll = HyperLogLog(2)
+        hll2 = HyperLogLog(2)
+
+        hll.set_register(0, 1)
+        hll2.set_register(3, 1)
+
+        hll.merge(hll2)
+        self.assertEqual(hll.registers(), expected)
 
 if __name__ == '__main__':
     unittest.main()
 
-"""
-import HLL
-n = HLL.HyperLogLog(12, 314)
-
-path='/usr/share/dict/words'
-f = open(path, 'r')
-i = 0
-for line in f.readlines():
-    tokens = line.split(' ')
-    for token in tokens:
-        if i % 100 is 0:
-            print n.murmur3_hash(token)
-        n.add(token)
-
-print dir(n)
-print n.cardinality()
-n.set_register(100,0)
-n.set_register(200,0)
-n.set_register(300,0)
-n.set_register(300,0)
-
-print n.cardinality()
-
-# intersection(hyperloglog)
-# hash(data)
-# fold()
-# union(hyperloglog)
-# set all registers(val)
-# check to see is VARARGS has a single arg component for hyperloglog_methods
-"""
