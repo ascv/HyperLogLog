@@ -1,6 +1,8 @@
 The HyperLogLog algorithm [1] provides a space efficient means to estimate the
 cardinality of extraordinarily large data sets. This module provides an
-implementation, written in C, for python 2.7.3 or python 3.x. See 
+implementation, written in C using a Murmur3 hash, for python 2.7.3 or python 3.x. 
+It is strongly recommended users unfamiliar with the algorithm see
+See 
 <a href="#theory">Theory</a> for an introduction to the algorithm.
 
 v0.6
@@ -65,26 +67,34 @@ Gets the number of registers.
 
 This section is intended to provide a description of the HyperLogLog algorithm,
 denoted HLL, and some intuition as to why it works. It is not a derivation of
-the algorithm. To motivate the discussion consider the following problem... 
+the algorithm nor is it a proof of  correctness.
+
+
+
+To motivate the introduction consider the following problem... 
 
 Suppose we have some multi-set (a set that contains 
 duplicate elements) whose cardinality we wish to know. Furthermore,
-suppose the memory occupied by this set is on the order of TB or PB of size. To recover
-the cardinality using a naive approach
-we could scan the elements and hash them, storing each hash in memory or on disk.
-The cardinality of the set is then the number of unique hashes. If the size of 
-each hash is 8 bytes and the cardinality of set is 100 billion, then there
-are 100 billion hashes occupying 8 * 10^11 bytes or approximately 754 GB. For 
-practical purposes this space requirement is prohibitively inefficient. 
+suppose the memory occupied by this set is on the order of TB or PB of size. Using a
+naive approach, we choose a hash function that randomly and independently
+distributes the bits. We could then scan the entire multi-set and hash each element.
+The cardinality is then the number of unique hashes. If each hash is 8 bytes = 64 bits
+and the cardinality is 100 billion then the space requirement is 8 bytes * 10^11 = 800 GB.
+This space requirement is prohibitively large for many practical applications.
 
-A more sophisticated approach might utilize linear counting, where each hash 
-instead determines the location of some bit in a vector of zero bits. The bit
-at this location is set to 1. After all the elements have been hashed and their 
-associated bits set to 1 the cardinality can then be computed by simply counting 
-the number of 1 bits in the vector. The space requirement is then the number of 
-bits in the bit vector. Using the previous example, this would require 100 
-billion bits or approximately 12 GB. This space requirement is still prohibitive 
-for many applications. 
+A more sophisticated strategy to computing the cardinality
+might utilize <i>linear counting</i>. Similar to the naive approach,
+linear counting hashes each element in the multi-set. However instead
+of storing the entire hash, each hash instead determines the index of a bit
+in an array of zero bits. After calculating this index, the corresponding
+bit in the array of zero bits if flipped and the hash is discarded. 
+The cardinality can then be recovered
+by counting the number of non-zero bits in the array.
+each hash instead determines the location of a one bit in an array of zero bits.
+The space requirement is then the size of the bit array. Considering the
+previous example, an array with 100 billion elements requires 10^11 bits = 12.5 GB.
+While this is a much more reasonable space requirement, it is still unsuitable
+for extraordinarily large cardinalities e.g. if the cardinality is 100 trillion bits = 12500 GB.
 
 HLL relies on making observations in the underlying bit-patterns of the 
 hashed elements As an explanatory example, we will consider an 8-bit case. 
