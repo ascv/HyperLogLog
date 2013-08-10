@@ -9,6 +9,8 @@ v0.6
 
 ## Setup
 
+Before running setup, you must have the python development headers installed on your machine.
+
     python setup build
 
 ## Quick start
