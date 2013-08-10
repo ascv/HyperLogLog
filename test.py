@@ -1,4 +1,5 @@
 from HLL import HyperLogLog
+from random import randint
 import unittest
 
 class TestRegisterFunctions(unittest.TestCase):
@@ -32,20 +33,26 @@ class TestRegisterFunctions(unittest.TestCase):
             self.hll.set_register(0, -1)
 
     def test_bytesarray_returned_from_registers_contains_correct_values(self):
-        """ """
+        expected = bytearray(32)
+        for i in range(32):
+            expected[i] = randint(0, 32)
+
+        for i in range(32):
+            self.hll.set_register(i, expected[i])
+
+        registers = self.hll.registers()
+        for i in range(32):
+            self.assertEqual(expected[i], registers[i])
 
     def test_registers_returns_bytesarray(self):
         self.assertTrue(type(self.hll.registers()) is bytearray)
 
-    def test_registesr_returns_correct_length_bytearray(self):
+    def test_registers_returns_correct_length_bytearray(self):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
 
     def setUp(self):
-        """ """
-
-    def test_add_adds_an_element_to_a_random_register(self):
         """ """
 
     def test_small_range_correction(self):
@@ -100,6 +107,9 @@ class TestHyperLogLogConstructor(unittest.TestCase):
     def test_seed_parameter_sets_seed(self):
         hll = HyperLogLog(5, seed=4)
         self.assertEqual(hll.seed(), 4)
+
+        hll2 = HyperLogLog(5, seed=2)
+        self.assertNotEqual(hll.murmur3_hash('test'), hll2.murmur3_hash('test'))
 
 class TestMerging(unittest.TestCase):
 
