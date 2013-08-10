@@ -242,7 +242,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 
     if (index > self->size) {
         char * msg = "Index greater than the number of registers.";
-        PyErr_SetString(PyExc_ValueError, msg);
+        PyErr_SetString(PyExc_IndexError, msg);
         return NULL;
     }
 
