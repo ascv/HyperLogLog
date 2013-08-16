@@ -81,7 +81,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
 
     /* use the first k bits as an index */
-    index = (*hash >> (32 - self->k)) + 1;
+    index = (*hash >> (32 - self->k)) - 1;
 
     /* compute the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
@@ -123,23 +123,23 @@ HyperLogLog_cardinality(HyperLogLog *self)
     double sum = 0.0;
     for (i = 0; i < self->size; i++) {
         rank = self->registers[i];
-        sum = sum + 1.0/pow(2, rank);
+        sum = sum + pow(2, -1*rank);
     }
 
     double raw_estimate = alpha * (1/sum) * self->size * self->size;   
     double estimate = 0;   
     if (raw_estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
-	uint32_t i;
+	    uint32_t i;
 
-	for (i = 0; i < self->size; i++) {
+	    for (i = 0; i < self->size; i++) {
     	    if (self->registers == 0)
 	        zeros += 1;
-	}
+	    }
 
         if (zeros != 0)
             estimate = self->size * log(self->size/zeros);
-	else
+	    else
             estimate = raw_estimate;
     }
     
