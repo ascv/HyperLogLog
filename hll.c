@@ -104,17 +104,17 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
     double alpha = 0.0;
     switch (self->size) {
-        case 16:
+      case 16:
       	  alpha = 0.673;
-	  break;
-        case 32:
-	  alpha = 0.697;
-	  break;
-        case 64:
-	  alpha = 0.709;
-	  break;
-        default:
-	  alpha = 0.7213/(1.0 + 1.079/(double) self->size);
+	      break;
+      case 32:
+	      alpha = 0.697;
+	      break;
+      case 64:
+	      alpha = 0.709;
+	      break;
+      default:
+	      alpha = 0.7213/(1.0 + 1.079/(double) self->size);
           break;
     }
   
