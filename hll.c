@@ -153,7 +153,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
 }
 
 /*
- * Get a Murmur3 hash of |data| as an unsigned integer.
+ * Get a Murmur3 hash of :data: as an unsigned integer.
  */
 static PyObject *
 HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
@@ -223,7 +223,7 @@ HyperLogLog_registers(HyperLogLog *self)
 }
 
 /*
- * Sets register |index| to |rank|.
+ * Sets register at :index: to :rank:.
  */
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
@@ -337,14 +337,14 @@ static PyTypeObject HyperLogLogType = {
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | 
-        Py_TPFLAGS_BASETYPE, /*tp_flags*/
+        Py_TPFLAGS_BASETYPE,   /*tp_flags*/
     "HyperLogLog object",      /* tp_doc */
-    0,		               /* tp_traverse */
-    0,		               /* tp_clear */
-    0,		               /* tp_richcompare */
-    0,		               /* tp_weaklistoffset */
-    0,		               /* tp_iter */
-    0,		               /* tp_iternext */
+    0,		                   /* tp_traverse */
+    0,		                   /* tp_clear */
+    0,		                   /* tp_richcompare */
+    0,		                   /* tp_weaklistoffset */
+    0,		                   /* tp_iter */
+    0,		                   /* tp_iternext */
     HyperLogLog_methods,       /* tp_methods */
     HyperLogLog_members,       /* tp_members */
     0,                         /* tp_getset */
@@ -416,7 +416,7 @@ PyMODINIT_FUNC initHLL(void)
 
 
 /* 
- * Get the number of leading zeros in |x|.
+ * Get the number of leading zeros.
  */
 uint32_t leadingZeroCount(uint32_t x) {
   x |= (x >> 1);
@@ -428,7 +428,7 @@ uint32_t leadingZeroCount(uint32_t x) {
 }
 
 /*
- * Get the number of bits set to 1 in |x|.
+ * Get the number of bits set to 1.
  */
 uint32_t ones(uint32_t x) {
   x -= (x >> 1) & 0x55555555;
