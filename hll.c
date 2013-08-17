@@ -10,6 +10,7 @@ typedef struct {
     short int k;      /* power, size = 2^k */
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
+    double alpha;
     double raw_estimate;
     uint32_t small_range;
     uint32_t med_range;
@@ -57,6 +58,8 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->registers = (char *)malloc(self->size * sizeof(char));
     memset(self->registers, 0, self->size);
 
+
+    self->alpha = 0;
     self->raw_estimate = 0;
     self->small_range = 0;
     self->med_range = 0;
@@ -72,13 +75,14 @@ static PyMemberDef HyperLogLog_members[] = {
 };
 
 static PyObject *
-HyperLogLog_debug(HyperLogLog *self, PyObject * args)
+HyperLogLog__debug(HyperLogLog *self, PyObject * args)
 {
-    PyObject* list = PyList_New(4);
+    PyObject* list = PyList_New(5);
     PyList_SetItem(list, 0, Py_BuildValue("d", self->raw_estimate));
     PyList_SetItem(list, 1, Py_BuildValue("I", self->small_range));
     PyList_SetItem(list, 2, Py_BuildValue("I", self->med_range));
     PyList_SetItem(list, 3, Py_BuildValue("I", self->large_range));
+    PyList_SetItem(list, 4, Py_BuildValue("d", self->alpha));
     return list;
 }
 
@@ -137,6 +141,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	      alpha = 0.7213/(1.0 + 1.079/(double) self->size);
           break;
     }
+    self->alpha = alpha; //DEBUG
   
     uint32_t i;
     double rank;
@@ -316,7 +321,7 @@ HyperLogLog_size(HyperLogLog* self)
 }
 
 static PyMethodDef HyperLogLog_methods[] = {
-    {"debug", (PyCFunction)HyperLogLog_debug, METH_NOARGS,
+    {"_debug", (PyCFunction)HyperLogLog__debug, METH_NOARGS,
      "Gets a list of debugging information: [raw estimate, small range, medium range, large range]"
      },
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
