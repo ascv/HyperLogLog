@@ -56,14 +56,19 @@ class TestCardinalityEstimation(unittest.TestCase):
         """ """
 
     def test_small_range_correction(self):
-        """ """
+        hll = HyperLogLog(5)
+        c = hll.cardinality() 
 
     def test_medium_range_no_correction(self):
-        """ """
-
+        hll = HyperLogLog(5)
+        hll.set_register(4, 2)
+        c = hll.cardinality()
+ 
     def test_large_range_correction(self):
-        """ """
-
+        hll = HyperLogLog(14)
+        hll.set_register(4, 2)
+        c = hll.cardinality()
+ 
     def test_the_larger_rank_is_used_when_comparing_elements(self):
         """ """
 

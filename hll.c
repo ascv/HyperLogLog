@@ -148,10 +148,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
     double sum = 0.0;
     for (i = 0; i < self->size; i++) {
         rank = (double) self->registers[i];
-        if (rank > 0) {
-            sum = sum + pow(2, -1*rank);
-            //self->raw_estimate = sum; //DEBUG
-        }
+        sum = sum + pow(2, -1*rank);
+        //self->raw_estimate = sum; //DEBUG
     }
     
     double raw_estimate = alpha * (1/sum) * self->size * self->size;  
