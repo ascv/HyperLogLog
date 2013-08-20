@@ -55,15 +55,19 @@ class TestCardinalityEstimation(unittest.TestCase):
     def setUp(self):
         """ """
 
+    #TODO: add asserts
     def test_small_range_correction(self):
         hll = HyperLogLog(5)
         c = hll.cardinality() 
 
+
+    #TODO: add asserts
     def test_medium_range_no_correction(self):
         hll = HyperLogLog(5)
         hll.set_register(4, 2)
         c = hll.cardinality()
  
+    #TODO: add asserts
     def test_large_range_correction(self):
         hll = HyperLogLog(14)
         hll.set_register(4, 2)
