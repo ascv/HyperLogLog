@@ -1,7 +1,7 @@
 The HyperLogLog algorithm [1] provides a space efficient means to estimate the
 cardinality of extraordinarily large data sets. This module provides an
 implementation, written in C, for python 2.7.3 or python 3.x. See 
-<a href="#theory">Theory</a> for an introduction to the algorithm..
+<a href="#theory">Theory</a> for an introduction to the algorithm.
 
 v0.6
 
