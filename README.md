@@ -63,8 +63,6 @@ Gets the number of registers.
 
 ## Algorithm
 
-The HLL algorithm is given by the following pseudocode:
-
 ```
 Let h: D --> [0, 1] = {0, 1}^32; // hash data from domain D to 32-bit words
 Let p(s) be the position of the leftmost 1-bit of s; // e.g. p(001...) = 3, p(0^k) = k + 1
