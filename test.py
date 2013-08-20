@@ -77,34 +77,3 @@ class TestMerging(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-"""
-import HLL
-n = HLL.HyperLogLog(12, 314)
-
-path='/usr/share/dict/words'
-f = open(path, 'r')
-i = 0
-for line in f.readlines():
-    tokens = line.split(' ')
-    for token in tokens:
-        if i % 100 is 0:
-            print n.murmur3_hash(token)
-        n.add(token)
-
-print dir(n)
-print n.cardinality()
-n.set_register(100,0)
-n.set_register(200,0)
-n.set_register(300,0)
-n.set_register(300,0)
-
-print n.cardinality()
-
-# intersection(hyperloglog)
-# hash(data)
-# fold()
-# union(hyperloglog)
-# set all registers(val)
-# check to see is VARARGS has a single arg component for hyperloglog_methods
-"""
