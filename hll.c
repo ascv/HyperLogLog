@@ -105,7 +105,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
 
     /* use the first k bits as a zero based index */
-    index = (*hash >> (32 - self->k)) - 1;
+    index = (*hash >> (32 - self->k));
 
     /* compute the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
