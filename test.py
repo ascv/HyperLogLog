@@ -56,18 +56,21 @@ class TestCardinalityEstimation(unittest.TestCase):
         """ """
 
     #TODO: add asserts
+    @unittest.skip('')
     def test_small_range_correction(self):
         hll = HyperLogLog(5)
         c = hll.cardinality() 
 
 
     #TODO: add asserts
+    @unittest.skip('')
     def test_medium_range_no_correction(self):
         hll = HyperLogLog(5)
         hll.set_register(4, 2)
         c = hll.cardinality()
  
     #TODO: add asserts
+    @unittest.skip('')
     def test_large_range_correction(self):
         hll = HyperLogLog(14)
         hll.set_register(4, 2)
