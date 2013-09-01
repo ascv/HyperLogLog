@@ -6,7 +6,7 @@ v0.7
 
 ## Setup
 
-    python setup build
+    sudo python setup install
 
 ## Quick start
 
