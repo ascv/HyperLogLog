@@ -10,6 +10,11 @@ typedef struct {
     short int k;      /* power, size = 2^k */
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
+    double alpha;
+    double raw_estimate;
+    uint32_t small_range;
+    uint32_t med_range;
+    uint32_t large_range;
     char * registers; /* array of ranks */
 } HyperLogLog;
 
@@ -52,6 +57,13 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->size = 1 << self->k;
     self->registers = (char *)malloc(self->size * sizeof(char));
     memset(self->registers, 0, self->size);
+
+
+    self->alpha = 0;
+    self->raw_estimate = 0;
+    self->small_range = 0;
+    self->med_range = 0;
+    self->large_range = 0;
     return 0; 
 }
 
@@ -61,6 +73,18 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 static PyMemberDef HyperLogLog_members[] = { 
     {NULL} /* Sentinel */
 };
+
+static PyObject *
+HyperLogLog__debug(HyperLogLog *self, PyObject * args)
+{
+    PyObject* list = PyList_New(5);
+    PyList_SetItem(list, 0, Py_BuildValue("d", self->raw_estimate));
+    PyList_SetItem(list, 1, Py_BuildValue("I", self->small_range));
+    PyList_SetItem(list, 2, Py_BuildValue("I", self->med_range));
+    PyList_SetItem(list, 3, Py_BuildValue("I", self->large_range));
+    PyList_SetItem(list, 4, Py_BuildValue("d", self->alpha));
+    return list;
+}
 
 /*
  * Adds an element to the cardinality estimator.
@@ -80,8 +104,8 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
 
-    /* use the first k bits as an index */
-    index = (*hash >> (32 - self->k)) + 1;
+    /* use the first k bits as a zero based index */
+    index = (*hash >> (32 - self->k));
 
     /* compute the rank of the remaining 32 - k bits */
     rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
@@ -104,56 +128,67 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
     double alpha = 0.0;
     switch (self->size) {
-        case 16:
+      case 16:
       	  alpha = 0.673;
-	  break;
-        case 32:
-	  alpha = 0.697;
-	  break;
-        case 64:
-	  alpha = 0.709;
-	  break;
-        default:
-	  alpha = 0.7213/(1.0 + 1.079/(double) self->size);
+	      break;
+      case 32:
+	      alpha = 0.697;
+	      break;
+      case 64:
+	      alpha = 0.709;
+	      break;
+      default:
+	      alpha = 0.7213/(1.0 + 1.079/(double) self->size);
           break;
     }
+    self->alpha = alpha; //DEBUG
   
     uint32_t i;
-    uint32_t rank;
+    double rank;
     double sum = 0.0;
     for (i = 0; i < self->size; i++) {
-        rank = self->registers[i];
-        sum = sum + 1.0/pow(2, rank);
+        rank = (double) self->registers[i];
+        sum = sum + pow(2, -1*rank);
+        //self->raw_estimate = sum; //DEBUG
     }
-
-    double raw_estimate = alpha * (1/sum) * self->size * self->size;   
+    
+    double raw_estimate = alpha * (1/sum) * self->size * self->size;  
+    
+    self->raw_estimate = raw_estimate; //DEBUG
+     
     double estimate = 0;   
     if (raw_estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
-	uint32_t i;
+	    uint32_t i;
 
-	for (i = 0; i < self->size; i++) {
+        self->small_range = 1; //DEBUG
+
+	    for (i = 0; i < self->size; i++) {
     	    if (self->registers == 0)
 	        zeros += 1;
-	}
+	    }
 
         if (zeros != 0)
             estimate = self->size * log(self->size/zeros);
-	else
+	    else
             estimate = raw_estimate;
     }
     
-    if (estimate <= (1.0/30.0) * two_32)
+    if (estimate <= (1.0/30.0) * two_32) {
         estimate = raw_estimate;
+        self->med_range = 1; //DEBUG
+    }
     
-    if (estimate > (1.0/30.0) * two_32)
+    if (estimate > (1.0/30.0) * two_32) {
         estimate = neg_two_32 * log(1.0 - raw_estimate/two_32);
+        self->large_range = 1; //DEBUG
+    }
 
     return Py_BuildValue("d", estimate);
 }
 
 /*
- * Get a Murmur3 hash of |data| as an unsigned integer.
+ * Get a Murmur3 hash of :data: as an unsigned integer.
  */
 static PyObject *
 HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
@@ -223,7 +258,7 @@ HyperLogLog_registers(HyperLogLog *self)
 }
 
 /*
- * Sets register |index| to |rank|.
+ * Sets register at :index: to :rank:.
  */
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
@@ -242,7 +277,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 
     if (index > self->size) {
         char * msg = "Index greater than the number of registers.";
-        PyErr_SetString(PyExc_ValueError, msg);
+        PyErr_SetString(PyExc_IndexError, msg);
         return NULL;
     }
 
@@ -284,6 +319,9 @@ HyperLogLog_size(HyperLogLog* self)
 }
 
 static PyMethodDef HyperLogLog_methods[] = {
+    {"_debug", (PyCFunction)HyperLogLog__debug, METH_NOARGS,
+     "Gets a list of debugging information: [raw estimate, small range, medium range, large range]"
+     },
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element to a random register."
     },
@@ -337,14 +375,14 @@ static PyTypeObject HyperLogLogType = {
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | 
-        Py_TPFLAGS_BASETYPE, /*tp_flags*/
+        Py_TPFLAGS_BASETYPE,   /*tp_flags*/
     "HyperLogLog object",      /* tp_doc */
-    0,		               /* tp_traverse */
-    0,		               /* tp_clear */
-    0,		               /* tp_richcompare */
-    0,		               /* tp_weaklistoffset */
-    0,		               /* tp_iter */
-    0,		               /* tp_iternext */
+    0,		                   /* tp_traverse */
+    0,		                   /* tp_clear */
+    0,		                   /* tp_richcompare */
+    0,		                   /* tp_weaklistoffset */
+    0,		                   /* tp_iter */
+    0,		                   /* tp_iternext */
     HyperLogLog_methods,       /* tp_methods */
     HyperLogLog_members,       /* tp_members */
     0,                         /* tp_getset */
@@ -416,7 +454,7 @@ PyMODINIT_FUNC initHLL(void)
 
 
 /* 
- * Get the number of leading zeros in |x|.
+ * Get the number of leading zeros.
  */
 uint32_t leadingZeroCount(uint32_t x) {
   x |= (x >> 1);
@@ -428,7 +466,7 @@ uint32_t leadingZeroCount(uint32_t x) {
 }
 
 /*
- * Get the number of bits set to 1 in |x|.
+ * Get the number of bits set to 1.
  */
 uint32_t ones(uint32_t x) {
   x -= (x >> 1) & 0x55555555;
