@@ -51,15 +51,16 @@ class TestRegisterFunctions(unittest.TestCase):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
-
+    """
+    """
     def setUp(self):
         """ """
 
-    #TODO: add asserts
     @unittest.skip('')
     def test_small_range_correction(self):
         hll = HyperLogLog(5)
-        c = hll.cardinality() 
+        self.assertEquals(hll.cardinality(), 0.0)
+        #manually calculate cardinality wo/correction and with correction
 
 
     #TODO: add asserts
@@ -147,3 +148,5 @@ class TestMerging(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
