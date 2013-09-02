@@ -58,7 +58,7 @@ class TestCardinalityEstimation(unittest.TestCase):
 
     def test_small_range_correction_all_registers_set_to_zero(self):
         hll = HyperLogLog(5)
-        self.assertEquals(hll.cardinality(), 0.0)
+        self.assertEqual(hll.cardinality(), 0.0)
 
     def test_small_range_correction_not_all_registers_set_to_zero(self):
         hll = HyperLogLog(5)
