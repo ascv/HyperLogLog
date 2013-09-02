@@ -80,9 +80,7 @@ linear counting hashes each element in the multi-set. However instead
 of storing the entire hash, each hash instead determines the index of a bit
 in an array of zero bits. After calculating this index, the corresponding
 bit in the array of zero bits is flipped and the hash is discarded. 
-The cardinality can then be recovered
-by counting the number of non-zero bits in the array.
-
+The cardinality can then be recovered by counting the number of non-zero bits in the array.
 The space requirement is the size of the bit array. Using the
 previous example, an array with 100 billion elements requires 10^11 bits = 12.5 GB.
 While this is a much more reasonable space requirement, it is still unsuitable
