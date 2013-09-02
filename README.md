@@ -42,7 +42,7 @@ registers of the merging object are unaffected.
 
 Gets a signed integer from a Murmur3 hash of <i>data</i> where <i>data</i> is a 
 string, buffer, or memoryview. Set <i>seed</i> to determine the seed
-value for the Murmur3 hash. The default value is objects default value.
+value for the Murmur3 hash. The default seed is HyperLogLog's default seed.
 
 ##### registers()
 
@@ -62,14 +62,14 @@ Gets the number of registers.
 
 ## Theory <a name='theory'></a>
 
-This section is intended to provide a description of the HyperLogLog algorithm,
-denoted HLL, and some intuition as to why it works. 
+This section is intended to provide a description of the HyperLogLog algorithm
+and some intuition as to why it works. 
 
 Suppose we have some multi-set (a set that contains 
-duplicate elements) whose cardinality we wish to know. Furthermore,
-suppose the memory occupied by this set is on the order of TB or PB of size. Using a
+duplicate elements) whose cardinality we wish to know and that
+the memory occupied by this set is on the order of TB or PB of size. Using a
 naive approach, we choose a hash function that randomly and independently
-distributes the bits. We could then scan the entire multi-set and hash each element.
+distributes the bits and hash each element of the multi-set.
 Duplicate elements are hashed to the same value so the cardinality is then the
 number of unique hashes. If each hash is 8 bytes = 64 bits
 and the cardinality is 100 billion then the space requirement is 8 bytes * 10^11 = 800 GB.
@@ -86,7 +86,7 @@ by counting the number of non-zero bits in the array.
 The space requirement is the size of the bit array. Using the
 previous example, an array with 100 billion elements requires 10^11 bits = 12.5 GB.
 While this is a much more reasonable space requirement, it is still unsuitable
-for extraordinarily large cardinalities e.g. if the cardinality is 100 trillion bits = 12500 GB.
+for extraordinarily large cardinalities e.g. if the cardinality is 1 trillion bits = 125 GB.
 
 HLL relies on making observations in the underlying bit-patterns of the 
 hashed elements As an explanatory example, we will consider an 8-bit case. 
@@ -103,26 +103,27 @@ from the left, so the rank is 5. Out of all the numbers that can be formed on
 8 bits, what is the probability of a number having rank 5? If we interpret the 
 sequence of bits as a sequence of coin flips where 0 is a tails, 1 is a heads 
 and k is the rank (the number of independent flips required to observe a heads) 
-then the rank is geometrically distributed according to:
+then there are k-1 tails with probability p and 1 heads with probability 1-p
+so the rank is geometrically distributed according to:
 
     P(X=k) = p^(k-1) * (1 - p)
 
-Since each bit has equal probability p=1/2 so:
+Each bit has equal probability of being a 1 or zero due to the properties
+of our hash function so p=1/2:
 
     P(X=k) = (1/2)^(k-1) * (1/2)
-	
-	P(X=k) = 1/2^k
+    
+    P(X=k) = 1/2^k
 	
 Then for the case of rank 5: 
 
     P(X=5) = 1/2^5
 
-Out of all of the possible numbers on 8 bits, how many might we expect to have 
-rank 5? Note P(X=5) is equivalent to:
+Note P(X=5) is equivalent to:
 
     P(X=5) = (# of rank 5 numbers) / (# of possible numbers on 8 bits)
     
-Then the number of elements of rank 5 is:
+It follows that:
 
     1/2^5 = (# of rank 5 numbers) / (2^8)
 
@@ -158,11 +159,10 @@ elements of M, then R provides a rough estimation of log_2(n) with some additive
 
 Using only a single observable introduces inaccuracy into the results. For 
 example, suppose all the elements of M have the same hash. This implies the elements are 
-not distinct e.g. the cardinality is 1. However the rank of the hash may be very large so 
-when the estimate for log_2(n)
-is computed the estimate will also be very large.
+not distinct e.g. the cardinality is 1. However the rank of the hash may be large so 
+when the estimate for log_2(n) is computed the estimate will be large and inaccurate.
 
-As an improvement, HLL divides M into m buckets and takes the maximum rank of each 
+As an improvement HLL uses multiple observables. HLL divides M into m buckets and takes the maximum rank of each 
 bucket. Then for each bucket, we have an estimate of log_2(n/m). These results 
 are averaged using a harmonic mean and then multiplied by a bias-reducing constant [1]. 
 
@@ -202,7 +202,7 @@ Algorithm HYPERLOGLOG(input M: a multiset of items from domain D)
 	
 	return cardinality estimate E* with typical relative error +/- 1.04/m^(1/2)
 ```
-    
+
 ## License
 
 This software is released under the [MIT License](https://gist.github.com/ascv/5123769).
