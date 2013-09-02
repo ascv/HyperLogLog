@@ -156,11 +156,13 @@ In other words, if M contains the hashed elements of a multi-set of unknown
 cardinality, n is the true cardinality of M, and R is the maximum rank amongst the 
 elements of M, then R provides a rough estimation of log_2(n) with some additive bias. 
 
-Furthermore using only a single observable introduces inaccuracy into the results. For 
+Using only a single observable introduces inaccuracy into the results. For 
 example, suppose all the elements of M have the same hash. This implies the elements are 
-not distinct. However the rank of the hash may be very so when the estimate for log_2(n)
-is computed the cardinality estimate will be very large even though there was only one
-element. As an improvement, HLL divides M into m buckets and takes the maximum rank of each 
+not distinct e.g. the cardinality is 1. However the rank of the hash may be very large so 
+when the estimate for log_2(n)
+is computed the estimate will also be very large.
+
+As an improvement, HLL divides M into m buckets and takes the maximum rank of each 
 bucket. Then for each bucket, we have an estimate of log_2(n/m). These results 
 are averaged using a harmonic mean and then multiplied by a bias-reducing constant [1]. 
 
