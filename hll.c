@@ -181,7 +181,6 @@ HyperLogLog_cardinality(HyperLogLog *self)
         self->large_range = zeros; 
         if (zeros != 0) {
             estimate = ((double)self->size )* log2(((double)self->size)/((double)zeros));
-            self->raw_estimate = estimate;
         }
     }
     
