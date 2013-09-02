@@ -15,6 +15,7 @@ typedef struct {
     uint32_t small_range;
     uint32_t med_range;
     uint32_t large_range;
+    double x;
     char * registers; /* array of ranks */
 } HyperLogLog;
 
@@ -58,8 +59,8 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->registers = (char *)malloc(self->size * sizeof(char));
     memset(self->registers, 0, self->size);
 
-
-    self->alpha = 0;
+    self->x = 0.0;
+    self->alpha = 0.0;
     self->raw_estimate = 0;
     self->small_range = 0;
     self->med_range = 0;
@@ -77,12 +78,13 @@ static PyMemberDef HyperLogLog_members[] = {
 static PyObject *
 HyperLogLog__debug(HyperLogLog *self, PyObject * args)
 {
-    PyObject* list = PyList_New(5);
+    PyObject* list = PyList_New(6);
     PyList_SetItem(list, 0, Py_BuildValue("d", self->raw_estimate));
     PyList_SetItem(list, 1, Py_BuildValue("I", self->small_range));
     PyList_SetItem(list, 2, Py_BuildValue("I", self->med_range));
     PyList_SetItem(list, 3, Py_BuildValue("I", self->large_range));
     PyList_SetItem(list, 4, Py_BuildValue("d", self->alpha));
+    PyList_SetItem(list, 5, Py_BuildValue("d", self->x));
     return list;
 }
 
@@ -152,35 +154,31 @@ HyperLogLog_cardinality(HyperLogLog *self)
         //self->raw_estimate = sum; //DEBUG
     }
     
-    double raw_estimate = alpha * (1/sum) * self->size * self->size;  
+    double estimate = alpha * (1/sum) * self->size * self->size;  
     
-    self->raw_estimate = raw_estimate; //DEBUG
+    self->raw_estimate = estimate; //DEBUG
      
-    double estimate = 0;   
-    if (raw_estimate <= 2.5 * self->size) {
+    if (estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
 	    uint32_t i;
 
         self->small_range = 1; //DEBUG
 
 	    for (i = 0; i < self->size; i++) {
-    	    if (self->registers == 0)
-	        zeros += 1;
+    	    if (self->registers[0] == 0)
+    	        zeros += 1;
 	    }
-
-        if (zeros != 0)
-            estimate = self->size * log(self->size/zeros);
-	    else
-            estimate = raw_estimate;
+    
+        if (zeros != 0) 
+            estimate = ((double)self->size )* log2(self->size/zeros);
     }
     
     if (estimate <= (1.0/30.0) * two_32) {
-        estimate = raw_estimate;
         self->med_range = 1; //DEBUG
     }
-    
-    if (estimate > (1.0/30.0) * two_32) {
-        estimate = neg_two_32 * log(1.0 - raw_estimate/two_32);
+
+    else if (estimate > (1.0/30.0) * two_32) {
+        estimate = neg_two_32 * log2(1.0 - estimate/two_32);
         self->large_range = 1; //DEBUG
     }
 
