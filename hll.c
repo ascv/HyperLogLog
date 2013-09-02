@@ -61,7 +61,7 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 
     self->x = 0.0;
     self->alpha = 0.0;
-    self->raw_estimate = 0;
+    self->raw_estimate = 0.0;
     self->small_range = 0;
     self->med_range = 0;
     self->large_range = 0;
@@ -125,6 +125,14 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
+    // DEBUG
+    self->x = 0.0;
+    self->alpha = 0.0;
+    self->raw_estimate = 0.0;
+    self->small_range = 0;
+    self->med_range = 0;
+    self->large_range = 0;
+
     static const double two_32 = 4294967296.0;
     static const double neg_two_32 = -4294967296.0;
 
@@ -165,12 +173,16 @@ HyperLogLog_cardinality(HyperLogLog *self)
         self->small_range = 1; //DEBUG
 
 	    for (i = 0; i < self->size; i++) {
-    	    if (self->registers[0] == 0)
+    	    if (self->registers[i] == 0) {
     	        zeros += 1;
+            }
 	    }
-    
-        if (zeros != 0) 
-            estimate = ((double)self->size )* log2(self->size/zeros);
+   
+        self->large_range = zeros; 
+        if (zeros != 0) {
+            estimate = ((double)self->size )* log2(((double)self->size)/((double)zeros));
+            self->raw_estimate = estimate;
+        }
     }
     
     if (estimate <= (1.0/30.0) * two_32) {
