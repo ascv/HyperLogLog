@@ -56,12 +56,16 @@ class TestCardinalityEstimation(unittest.TestCase):
     def setUp(self):
         """ """
 
-    @unittest.skip('')
-    def test_small_range_correction(self):
+    def test_small_range_correction_all_registers_set_to_zero(self):
         hll = HyperLogLog(5)
         self.assertEquals(hll.cardinality(), 0.0)
-        #manually calculate cardinality wo/correction and with correction
 
+    def test_small_range_correction_not_all_registers_set_to_zero(self):
+        hll = HyperLogLog(5)
+        hll.set_register(0, 1)
+        c = hll.cardinality()
+        used_approximation = 1.46571806761 <= c and c <= 1.46571806762
+        self.assertTrue(used_approximation)
 
     #TODO: add asserts
     @unittest.skip('')
