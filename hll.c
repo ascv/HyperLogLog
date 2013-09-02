@@ -120,7 +120,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 };
 
 /*
- * Gets the cardinality estimate.
+ * Gets a cardinality estimate.
  */
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
@@ -159,11 +159,9 @@ HyperLogLog_cardinality(HyperLogLog *self)
     for (i = 0; i < self->size; i++) {
         rank = (double) self->registers[i];
         sum = sum + pow(2, -1*rank);
-        //self->raw_estimate = sum; //DEBUG
     }
     
     double estimate = alpha * (1/sum) * self->size * self->size;  
-    
     self->raw_estimate = estimate; //DEBUG
      
     if (estimate <= 2.5 * self->size) {
@@ -213,7 +211,6 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
     return Py_BuildValue("i", *hash);
 }
 
-
 /*
  * Merges another HyperLogLog with the current HyperLogLog by taking the maximum
  * value of each register. The registers of the other HyperLogLog are 
@@ -253,7 +250,6 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     Py_INCREF(Py_None);
     return Py_None;
 } 
-
 
 /*
  * Gets a copy of the registers as a bytesarray.
@@ -460,7 +456,6 @@ PyMODINIT_FUNC initHLL(void)
     return m;
 #endif
 }
-
 
 /* 
  * Get the number of leading zeros.
