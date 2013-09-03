@@ -10,12 +10,6 @@ typedef struct {
     short int k;      /* power, size = 2^k */
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
-    double alpha;
-    double raw_estimate;
-    uint32_t small_range;
-    uint32_t med_range;
-    uint32_t large_range;
-    double x;
     char * registers; /* array of ranks */
 } HyperLogLog;
 
@@ -59,12 +53,6 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->registers = (char *)malloc(self->size * sizeof(char));
     memset(self->registers, 0, self->size);
 
-    self->x = 0.0;
-    self->alpha = 0.0;
-    self->raw_estimate = 0.0;
-    self->small_range = 0;
-    self->med_range = 0;
-    self->large_range = 0;
     return 0; 
 }
 
@@ -74,19 +62,6 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 static PyMemberDef HyperLogLog_members[] = { 
     {NULL} /* Sentinel */
 };
-
-static PyObject *
-HyperLogLog__debug(HyperLogLog *self, PyObject * args)
-{
-    PyObject* list = PyList_New(6);
-    PyList_SetItem(list, 0, Py_BuildValue("d", self->raw_estimate));
-    PyList_SetItem(list, 1, Py_BuildValue("I", self->small_range));
-    PyList_SetItem(list, 2, Py_BuildValue("I", self->med_range));
-    PyList_SetItem(list, 3, Py_BuildValue("I", self->large_range));
-    PyList_SetItem(list, 4, Py_BuildValue("d", self->alpha));
-    PyList_SetItem(list, 5, Py_BuildValue("d", self->x));
-    return list;
-}
 
 /*
  * Adds an element to the cardinality estimator.
@@ -125,14 +100,6 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
-    // DEBUG
-    self->x = 0.0;
-    self->alpha = 0.0;
-    self->raw_estimate = 0.0;
-    self->small_range = 0;
-    self->med_range = 0;
-    self->large_range = 0;
-
     static const double two_32 = 4294967296.0;
     static const double neg_two_32 = -4294967296.0;
 
@@ -151,7 +118,6 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	      alpha = 0.7213/(1.0 + 1.079/(double) self->size);
           break;
     }
-    self->alpha = alpha; //DEBUG
   
     uint32_t i;
     double rank;
@@ -162,13 +128,10 @@ HyperLogLog_cardinality(HyperLogLog *self)
     }
     
     double estimate = alpha * (1/sum) * self->size * self->size;  
-    self->raw_estimate = estimate; //DEBUG
      
     if (estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
 	    uint32_t i;
-
-        self->small_range = 1; //DEBUG
 
 	    for (i = 0; i < self->size; i++) {
     	    if (self->registers[i] == 0) {
@@ -176,19 +139,13 @@ HyperLogLog_cardinality(HyperLogLog *self)
             }
 	    }
    
-        self->large_range = zeros; 
         if (zeros != 0) {
             estimate = ((double)self->size )* log2(((double)self->size)/((double)zeros));
         }
     }
-    
-    if (estimate <= (1.0/30.0) * two_32) {
-        self->med_range = 1; //DEBUG
-    }
 
-    else if (estimate > (1.0/30.0) * two_32) {
+    if (estimate > (1.0/30.0) * two_32) {
         estimate = neg_two_32 * log2(1.0 - estimate/two_32);
-        self->large_range = 1; //DEBUG
     }
 
     return Py_BuildValue("d", estimate);
@@ -324,9 +281,6 @@ HyperLogLog_size(HyperLogLog* self)
 }
 
 static PyMethodDef HyperLogLog_methods[] = {
-    {"_debug", (PyCFunction)HyperLogLog__debug, METH_NOARGS,
-     "Gets a list of debugging information: [raw estimate, small range, medium range, large range]"
-     },
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element to a random register."
     },
