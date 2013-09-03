@@ -18,9 +18,9 @@ HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
 #if PY_MAJOR_VERSION >= 3
-    Py_TYPE(self)->tp_free((PyObject*)self);
+    Py_TYPE(self)->tp_free((PyObject*) self);
 #else
-    self->ob_type->tp_free((PyObject*)self);
+    self->ob_type->tp_free((PyObject*) self);
 #endif
 }
 
@@ -50,7 +50,7 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     } 
 
     self->size = 1 << self->k;
-    self->registers = (char *)malloc(self->size * sizeof(char));
+    self->registers = (char *) malloc(self->size * sizeof(char));
     memset(self->registers, 0, self->size);
 
     return 0; 
@@ -140,8 +140,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	    }
    
         if (zeros != 0) {
-            double x = (double)self->size / (double)zeros;
-            estimate = ((double)self->size )* log2(x);
+            double size = (double) self->size;
+            estimate = size * log2(size / (double) zeros);
         }
     }
 
