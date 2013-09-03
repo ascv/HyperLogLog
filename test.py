@@ -24,7 +24,7 @@ class TestRegisterFunctions(unittest.TestCase):
 
     def test_set_register_with_greater_than_max_rank_fails(self):
         with self.assertRaises(ValueError):
-            self.hll.set_register(0, 33)
+            self.hll.set_register(0, 16)
 
     def test_set_register_with_index_out_of_bounds(self):
         with self.assertRaises(IndexError):
@@ -66,8 +66,8 @@ class TestCardinalityEstimation(unittest.TestCase):
         hll = HyperLogLog(5)
         hll.set_register(0, 1)
         c = hll.cardinality()
-        used_approximation = 1.46571806761 <= c and c <= 1.46571806762
-        self.assertTrue(used_approximation)
+        used_correction= 1.46571806761 <= c and c <= 1.46571806762
+        self.assertTrue(used_correction)
 
     #TODO: add asserts
     @unittest.skip('')
@@ -76,12 +76,14 @@ class TestCardinalityEstimation(unittest.TestCase):
         hll.set_register(4, 2)
         c = hll.cardinality()
  
-    #TODO: add asserts
-    @unittest.skip('')
     def test_large_range_correction(self):
-        hll = HyperLogLog(14)
-        hll.set_register(4, 2)
+        hll = HyperLogLog(16)
+        for i in range(hll.size()):
+            hll.set_register(i, 16)
+
         c = hll.cardinality()
+        used_correction = 7916284520 <= c and c <= 7916284521
+        self.assertTrue(used_correction)
  
     def test_the_larger_rank_is_used_when_comparing_elements(self):
         """ """
