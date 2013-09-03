@@ -140,7 +140,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	    }
    
         if (zeros != 0) {
-            estimate = ((double)self->size )* log2(((double)self->size)/((double)zeros));
+            double x = (double)self->size / (double)zeros;
+            estimate = ((double)self->size )* log2(x);
         }
     }
 
