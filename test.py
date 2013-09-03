@@ -24,7 +24,7 @@ class TestRegisterFunctions(unittest.TestCase):
 
     def test_set_register_with_greater_than_max_rank_fails(self):
         with self.assertRaises(ValueError):
-            self.hll.set_register(0, 16)
+            self.hll.set_register(0, 17)
 
     def test_set_register_with_index_out_of_bounds(self):
         with self.assertRaises(IndexError):
@@ -37,7 +37,7 @@ class TestRegisterFunctions(unittest.TestCase):
     def test_bytesarray_returned_from_registers_contains_correct_values(self):
         expected = bytearray(32)
         for i in range(32):
-            expected[i] = randint(0, 32)
+            expected[i] = randint(0, 16)
 
         for i in range(32):
             self.hll.set_register(i, expected[i])
