@@ -2,7 +2,7 @@ from HLL import HyperLogLog
 from random import randint
 import unittest
 
-# create test for add: data as string, data as buffer, data as memory view
+#TODO: create test for add: data as string, data as buffer, data as memory view
 
 class TestRegisterFunctions(unittest.TestCase):
 
