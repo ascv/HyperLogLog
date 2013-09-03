@@ -286,7 +286,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
         return NULL;
     }
 
-    if (rank > 32) {
+    if (rank > 16) {
         char * msg = "Rank is greater than the maximum possible rank.";
         PyErr_SetString(PyExc_ValueError, msg);
         return NULL;
