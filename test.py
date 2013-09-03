@@ -53,10 +53,6 @@ class TestRegisterFunctions(unittest.TestCase):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
-    """
-    """
-    def setUp(self):
-        """ """
 
     def test_small_range_correction_all_registers_set_to_zero(self):
         hll = HyperLogLog(5)
@@ -69,12 +65,14 @@ class TestCardinalityEstimation(unittest.TestCase):
         used_correction= 1.46571806761 <= c and c <= 1.46571806762
         self.assertTrue(used_correction)
 
-    #TODO: add asserts
-    @unittest.skip('')
     def test_medium_range_no_correction(self):
         hll = HyperLogLog(5)
-        hll.set_register(4, 2)
+        for i in range(32):
+            hll.set_register(i, 2)
+
         c = hll.cardinality()
+        no_correction = 89.216 <= c and c <= 89.217
+        self.assertTrue(no_correction)
  
     def test_large_range_correction(self):
         hll = HyperLogLog(16)
