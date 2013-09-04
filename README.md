@@ -6,14 +6,14 @@ v0.72
 
 ## Setup
 
-You will need Python.h available from the python development package. On Ubuntu/Debian
+You will need the python development package. On Ubuntu/Debian
 you can install this package using:
 
     sudo apt-get install python-dev
 
 Now install using setup.py:
 
-    sudo python setup install
+    sudo python setup.py install
 
 ## Quick start
 
