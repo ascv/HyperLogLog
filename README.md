@@ -87,9 +87,7 @@ the  naive approach, linear counting hashes each element in the multi-set. Howev
 instead of storing the entire hash, each hash instead determines the index of a 
 bit in an array of zero bits. This bit is set to 1 and the hash discarded. The 
 cardinality can then be estimated by counting the number of non-zero bits in the 
-array. 
-
-The space requirement is size of the bit array. Using the previous example, 
+array. The space requirement is size of the bit array. Using the previous example, 
 an array with 100 billion elements requires 10^11 bits = 12.5 GB to accurately 
 estimate the cardinality. While this is a more reasonable space requirement, 
 it is still unsuitable for  extraordinarily large cardinalities e.g. if the 
