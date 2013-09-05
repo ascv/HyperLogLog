@@ -153,9 +153,11 @@ rank k. Moreover,
 
     P(X=k) ≈ r / n	
 	
-    n ≈  r / P(X=k)
+    n ≈ r / P(X=k)
+    
+    n ≈ r / 1/2^k
 	
-    n ≈  r * 2^k
+    n ≈ r * 2^k
 	
     log_2(n) ≈ k + log2(r)            
 	
