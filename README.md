@@ -4,7 +4,7 @@ implementation, written in C using a Murmur3 hash, for python 2.7.x or python 3.
 
 v0.72
 
-## Setup
+## Setup ##
 
 You will need the python development package. On Ubuntu/Mint
 you can install this package using:
@@ -15,7 +15,7 @@ Now install using setup.py:
 
     sudo python setup.py install
 
-## Quick start
+## Quick start ##
 
     from HLL import HyperLogLog
     
@@ -23,9 +23,9 @@ Now install using setup.py:
     hll.add('some data')
     estimate = hll.cardinality()
   
-## Documentation
+## Documentation ##
 
-##### HyperLogLog(<i>k [,seed])
+##### HyperLogLog(<i>k [,seed]) #####
 
 Create a new HyperLogLog using 2^<i>k</i> registers, <i>k</i> must be in the 
 range [2, 16]. Set <i>seed</i> to determine the seed value for the Murmur3 
@@ -72,33 +72,36 @@ Gets the number of registers.
 This section is intended to provide a description of the HyperLogLog algorithm
 and some intuition as to why it works. 
 
-Suppose we have some multi-set (a set that contains 
-duplicate elements) whose cardinality we wish to know and that
-the memory occupied by this set is on the order of TB or PB of size. Using a
-naive approach, we choose a hash function that randomly and independently
-distributes the bits and hash each element of the multi-set.
-Duplicate elements are hashed to the same value so the cardinality is then the
-number of unique hashes. If each hash is 8 bytes = 64 bits
-and the cardinality is 100 billion then the space requirement is 8 bytes * 10^11 = 800 GB.
-This space requirement is prohibitively large for many practical applications.
+Suppose we have some multi-set (a set containing duplicate elements) occupying 
+several TB or PB of disk space and we wish to know the cardinality of this set. 
+Using a naive approach, we choose a hash function that randomly and independently
+distributes the bits and then hash each element of the multi-set. Duplicate 
+elements hash to the same value so the cardinality can then be estimated by
+counting the number of hashes. If the cardinality is 100 billion and each hash 
+occupies 64 bits then the space required to store the hashes is 64 bits * 10^11 
+= 800 GB. This space requirement is prohibitively large for many practical 
+applications.
 
-A more sophisticated strategy might utilize <i>linear counting</i>. Similar to the naive approach,
-linear counting hashes each element in the multi-set. However instead
-of storing the entire hash, each hash instead determines the index of a bit
-in an array of zero bits. After calculating this index, the corresponding
-bit in the array of zero bits is flipped and the hash is discarded. 
-The cardinality can then be recovered by counting the number of non-zero bits in the array.
-The space requirement is the size of the bit array. Using the
-previous example, an array with 100 billion elements requires 10^11 bits = 12.5 GB.
-While this is a much more reasonable space requirement, it is still unsuitable
-for extraordinarily large cardinalities e.g. if the cardinality is 1 trillion bits = 125 GB.
+A more sophisticated strategy might utilize <i>linear counting</i>. Similar to 
+the  naive approach, linear counting hashes each element in the multi-set. However 
+instead of storing the entire hash, each hash instead determines the index of a 
+bit in an array of zero bits. This bit is set to 1 and the hash discarded. The 
+cardinality can then be estimated by counting the number of non-zero bits in the 
+array. 
+
+The space requirement is size of the bit array. Using the previous example, 
+an array with 100 billion elements requires 10^11 bits = 12.5 GB to accurately 
+estimate the cardinality. While this is a more reasonable space requirement, 
+it is still unsuitable for  extraordinarily large cardinalities e.g. if the 
+cardinality is 1 trillion then the space required to store the bits is 1 
+trillion bits = 125 GB.
 
 HLL relies on making observations in the underlying bit-patterns of the 
-hashed elements As an explanatory example, we will consider an 8-bit case. 
+hashed elements. As an explanatory example consider an 8-bit case. 
 Suppose h(x) is a hash function that randomly distributes the bits of x 
-with equal probability. Then a hashed element might have the following 
-distribution of bits:
-  
+independelty and with equal probability. Then a hashed element might have the 
+following distribution of bits:
+
 |  0  | 0  | 0  | 0  | 1  | 1  | 0  | 1  |
 | --- |:--:|:--:|:--:|:--:|:--:|:--:| --:|
 
