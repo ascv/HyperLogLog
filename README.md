@@ -151,13 +151,13 @@ More generally, if there are n distinct elements and r is the number of elements
 with rank k, then we would expect about n/2^k of the hashed elements to have 
 rank k. Moreover,
 
-    P(X=k) ~ r / n	
+    P(X=k) ≈ r / n	
 	
-    n ~  r / P(X=k)
+    n ≈  r / P(X=k)
 	
-    n ~  r * 2^k
+    n ≈  r * 2^k
 	
-    log_2(n) ~ k + log2(r)            
+    log_2(n) ≈ k + log2(r)            
 	
 In other words, if M contains the hashed elements of a multi-set of unknown 
 cardinality, n is the true cardinality of M, and R is the maximum rank amongst the 
