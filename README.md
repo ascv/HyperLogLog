@@ -35,8 +35,8 @@ hash. The default value is 314.
 
 ##### add(<i>data</i>)
 
-Adds <i>data</i> to the estimator where <i>data</i> is a string or buffer. 
-
+Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or bytes
+in python 3.x. 
 
 ##### merge(<i>HyperLogLog</i>)
 
