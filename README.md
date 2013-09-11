@@ -1,6 +1,7 @@
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
 cardinality of extraordinarily large data sets. This module provides an
-implementation, written in C using a Murmur3 hash, for python 2.7.x or python 3.x. 
+implementation, written in C using a Murmur3 hash, for python 2.7.x or 
+python 3.x.
 
 v0.72
 
@@ -40,16 +41,15 @@ Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or byte
 
 ##### merge(<i>HyperLogLog</i>)
 
-Merges another HyperLogLog object with the current object. Merging compares the 
-registers of each object, setting the register of the current object to the 
-maximum value. Only the registers of the current object are affected, the 
-registers of the merging object are unaffected.
+Merges another HyperLogLog object. Merging takes the maximum value for each
+register and sets the current HyperLogLog's register to that value. The registers
+of the merging object are unaffected. 
 
 ##### murmur3_hash(<i>data [,seed]</i>)
 
 Gets a signed integer from a Murmur3 hash of <i>data</i> where <i>data</i> is a 
 string, buffer, or bytes (python 3.x). Set <i>seed</i> to determine the seed
-value for the Murmur3 hash. The default seed is HyperLogLog's default seed.
+value for the Murmur3 hash. The default seed is 314.
 
 ##### registers()
 
