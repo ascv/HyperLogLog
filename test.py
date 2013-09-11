@@ -11,20 +11,20 @@ class TestAdd(unittest.TestCase):
     def test_add_string(self):
         try:
             self.hll.add('asdf')
-        except Exception, ex:
+        except Exception as ex:
             self.fail('failed to add string: %s' % ex)
 
-    @unittest.skipif(sys.version_info[0] > 2)
+    @unittest.skipIf(sys.version_info[0] > 2, 'buffer is deprecated in python 3.x')
     def test_add_buffer(self):
         try:
             self.hll.add(buffer('asdf'))
-        except Exception, ex:
+        except Exception as ex:
             self.fail('failed to add buffer: %s' % ex)
 
     def test_add_bytes(self):
         try:
             self.hll.add(b'asdf')
-        except Exception, ex:
+        except Exception as ex:
             self.fail('failed to add bytes: %s' % ex)
 
 
