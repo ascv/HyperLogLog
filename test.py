@@ -1,29 +1,32 @@
 from HLL import HyperLogLog
 from random import randint
 import unittest
+import sys
 
 class TestAdd(unittest.TestCase):
 
     def setUp(self):
         self.hll = HyperLogLog(5)
 
-    def _verify_only_one_register_set(self, registers):
-        num_nonzero_registers = 0
-        for register in registers:
-            if register != 0:
-                num_nonzero_registers += 1
-            if num_nonzero_registers > 1:
-                self.fail('more than one register was set')
-
-        self.assertEqual(num_nonzero_registers, 1)
- 
     def test_add_string(self):
-        self.hll.add('asdf')
-        self._verify_only_one_register_set(self.hll.registers())
+        try:
+            self.hll.add('asdf')
+        except Exception, ex:
+            self.fail('failed to add string: %s' % ex)
 
+    @unittest.skipif(sys.version_info[0] > 2)
     def test_add_buffer(self):
-        self.hll.add(buffer('asdf'))
-        self._verify_only_one_register_set(self.hll.registers())
+        try:
+            self.hll.add(buffer('asdf'))
+        except Exception, ex:
+            self.fail('failed to add buffer: %s' % ex)
+
+    def test_add_bytes(self):
+        try:
+            self.hll.add(b'asdf')
+        except Exception, ex:
+            self.fail('failed to add bytes: %s' % ex)
+
 
 class TestCardinalityEstimation(unittest.TestCase):
 
