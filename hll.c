@@ -153,7 +153,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
 }
 
 /*
- * Get a Murmur3 hash of :data: as an unsigned integer.
+ * Get a Murmur3 hash of a python string, buffer or bytes (python 3.x) as an unsigned 
+ * integer. TODO: check signed or unsigned
  */
 static PyObject *
 HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
@@ -170,14 +171,12 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
 }
 
 /*
- * Merges another HyperLogLog with the current HyperLogLog by taking the maximum
- * value of each register. The registers of the other HyperLogLog are 
- * unaffected.
+ * Merges another HyperLogLog into the current HyperLogLog. The registers of
+ * the other HyperLogLog are unaffected.
  */
 static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args) 
 {
-  
     PyObject *hll;
     if (!PyArg_ParseTuple(args, "O", &hll)) //TODO: use O! to check type
         return NULL;
@@ -221,7 +220,7 @@ HyperLogLog_registers(HyperLogLog *self)
 }
 
 /*
- * Sets register at :index: to :rank:.
+ * Sets register at index to rank.
  */
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
@@ -283,7 +282,7 @@ HyperLogLog_size(HyperLogLog* self)
 
 static PyMethodDef HyperLogLog_methods[] = {
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
-     "Add an element to a random register."
+     "Add an element."
     },
     {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
      "Get the cardinality."
@@ -292,7 +291,7 @@ static PyMethodDef HyperLogLog_methods[] = {
      "Merge another HyperLogLog object with the current HyperLogLog."
      },
     {"murmur3_hash", (PyCFunction)HyperLogLog_murmur3_hash, METH_VARARGS,
-     "Gets a Murmur3 hash of the passed data."
+     "Gets a Murmur3 hash"
      },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a copy of the registers as a bytearray."
