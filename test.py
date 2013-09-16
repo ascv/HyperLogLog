@@ -54,23 +54,23 @@ class TestRegisterFunctions(unittest.TestCase):
 
 class TestCardinalityEstimation(unittest.TestCase):
 
+    def setUp(self):
+        self.hll = HyperLogLog(5)
+
     def test_small_range_correction_all_registers_set_to_zero(self):
-        hll = HyperLogLog(5)
-        self.assertEqual(hll.cardinality(), 0.0)
+        self.assertEqual(self.hll.cardinality(), 0.0)
 
     def test_small_range_correction_not_all_registers_set_to_zero(self):
-        hll = HyperLogLog(5)
-        hll.set_register(0, 1)
-        c = hll.cardinality()
+        self.hll.set_register(0, 1)
+        c = self.hll.cardinality()
         used_correction= 1.46571806761 <= c and c <= 1.46571806762
         self.assertTrue(used_correction)
 
     def test_medium_range_no_correction(self):
-        hll = HyperLogLog(5)
         for i in range(32):
-            hll.set_register(i, 2)
+            self.hll.set_register(i, 2)
 
-        c = hll.cardinality()
+        c = self.hll.cardinality()
         no_correction = 89.216 <= c and c <= 89.217
         self.assertTrue(no_correction)
  
