@@ -83,9 +83,6 @@ class TestCardinalityEstimation(unittest.TestCase):
         used_correction = 7916284520 <= c and c <= 7916284521
         self.assertTrue(used_correction)
  
-    def test_the_larger_rank_is_used_when_comparing_elements(self):
-        """ """
-
 class TestHyperLogLogConstructor(unittest.TestCase):
 
     def test_one_is_invalid_size(self):
