@@ -4,7 +4,28 @@ import unittest
 
 #TODO: create test for add: data as string, data as buffer, data as memory view
 
+class TestAdd(unittest.TestCase):
 
+    def setUp(self):
+        self.hll = HyperLogLog(5)
+
+    def _verify_only_one_register_set(self, registers):
+        num_nonzero_registers = 0
+        for register in registers:
+            if register != 0:
+                num_nonzero_registers += 1
+            if num_nonzero_registers > 1:
+                self.fail('more than one register was set')
+
+        self.assertEqual(num_nonzero_registers, 1)
+ 
+    def test_add_string(self):
+        self.hll.add('asdf')
+        self._verify_only_one_register_set(self.hll.registers())
+
+    def test_add_buffer(self):
+        self.hll.add(buffer('asdf'))
+        self._verify_only_one_register_set(self.hll.registers())
 
 class TestCardinalityEstimation(unittest.TestCase):
 
