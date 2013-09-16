@@ -36,7 +36,7 @@ hash. The default value is 314.
 ##### add(<i>data</i>)
 
 Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or bytes
-in python 3.x. 
+(python 3.x). 
 
 ##### merge(<i>HyperLogLog</i>)
 
@@ -48,7 +48,7 @@ registers of the merging object are unaffected.
 ##### murmur3_hash(<i>data [,seed]</i>)
 
 Gets a signed integer from a Murmur3 hash of <i>data</i> where <i>data</i> is a 
-string, buffer, or memoryview. Set <i>seed</i> to determine the seed
+string, buffer, or bytes (python 3.x). Set <i>seed</i> to determine the seed
 value for the Murmur3 hash. The default seed is HyperLogLog's default seed.
 
 ##### registers()
