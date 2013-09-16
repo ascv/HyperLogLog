@@ -35,8 +35,8 @@ hash. The default value is 314.
 
 ##### add(<i>data</i>)
 
-Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or 
-memoryview.
+Adds <i>data</i> to the estimator where <i>data</i> is a string or buffer. 
+
 
 ##### merge(<i>HyperLogLog</i>)
 
