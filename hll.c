@@ -374,9 +374,9 @@ static PyMethodDef module_methods[] = {
 PyMODINIT_FUNC
 PyInit_HLL(void)
 #else
-#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
-#define PyMODINIT_FUNC void
-#endif
+    #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+        #define PyMODINIT_FUNC void
+    #endif
 PyMODINIT_FUNC initHLL(void) 
 #endif
 {
