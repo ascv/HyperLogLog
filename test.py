@@ -4,53 +4,7 @@ import unittest
 
 #TODO: create test for add: data as string, data as buffer, data as memory view
 
-class TestRegisterFunctions(unittest.TestCase):
 
-    def setUp(self):
-        self.k = 5
-        self.hll = HyperLogLog(5)
-
-    def test_set_last_register(self):
-        self.hll.set_register(self.k - 1, 1)
-        self.assertTrue(self.hll.registers()[self.k - 1] == 1)
-
-    def test_set_first_register(self):
-        self.hll.set_register(0, 1)
-        self.assertTrue(self.hll.registers()[0] == 1)
-
-    def test_set_register_with_negative_value_fails(self):
-        with self.assertRaises(ValueError):
-            self.hll.set_register(0, -1)
-
-    def test_set_register_with_greater_than_max_rank_fails(self):
-        with self.assertRaises(ValueError):
-            self.hll.set_register(0, 17)
-
-    def test_set_register_with_index_out_of_bounds(self):
-        with self.assertRaises(IndexError):
-            self.hll.set_register(33, 1)
-
-    def test_set_register_with_negative_index_fails(self):
-        with self.assertRaises(ValueError):
-            self.hll.set_register(0, -1)
-
-    def test_bytesarray_returned_from_registers_contains_correct_values(self):
-        expected = bytearray(32)
-        for i in range(32):
-            expected[i] = randint(0, 16)
-
-        for i in range(32):
-            self.hll.set_register(i, expected[i])
-
-        registers = self.hll.registers()
-        for i in range(32):
-            self.assertEqual(expected[i], registers[i])
-
-    def test_registers_returns_bytesarray(self):
-        self.assertTrue(type(self.hll.registers()) is bytearray)
-
-    def test_registers_returns_correct_length_bytearray(self):
-        self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 class TestCardinalityEstimation(unittest.TestCase):
 
@@ -149,7 +103,53 @@ class TestMerging(unittest.TestCase):
         hll.merge(hll2)
         self.assertEqual(hll.registers(), expected)
 
+class TestRegisterFunctions(unittest.TestCase):
+
+    def setUp(self):
+        self.k = 5
+        self.hll = HyperLogLog(5)
+
+    def test_set_last_register(self):
+        self.hll.set_register(self.k - 1, 1)
+        self.assertTrue(self.hll.registers()[self.k - 1] == 1)
+
+    def test_set_first_register(self):
+        self.hll.set_register(0, 1)
+        self.assertTrue(self.hll.registers()[0] == 1)
+
+    def test_set_register_with_negative_value_fails(self):
+        with self.assertRaises(ValueError):
+            self.hll.set_register(0, -1)
+
+    def test_set_register_with_greater_than_max_rank_fails(self):
+        with self.assertRaises(ValueError):
+            self.hll.set_register(0, 17)
+
+    def test_set_register_with_index_out_of_bounds(self):
+        with self.assertRaises(IndexError):
+            self.hll.set_register(33, 1)
+
+    def test_set_register_with_negative_index_fails(self):
+        with self.assertRaises(ValueError):
+            self.hll.set_register(0, -1)
+
+    def test_bytesarray_returned_from_registers_contains_correct_values(self):
+        expected = bytearray(32)
+        for i in range(32):
+            expected[i] = randint(0, 16)
+
+        for i in range(32):
+            self.hll.set_register(i, expected[i])
+
+        registers = self.hll.registers()
+        for i in range(32):
+            self.assertEqual(expected[i], registers[i])
+
+    def test_registers_returns_bytesarray(self):
+        self.assertTrue(type(self.hll.registers()) is bytearray)
+
+    def test_registers_returns_correct_length_bytearray(self):
+        self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
+
 if __name__ == '__main__':
     unittest.main()
-
-
