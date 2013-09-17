@@ -203,7 +203,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 	    self->registers[i] = hllRegisters[i];
     }
 
-    free(hllRegisters);
+    //free(hllRegisters);
     Py_INCREF(Py_None);
     return Py_None;
 } 
