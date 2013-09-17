@@ -5,7 +5,7 @@ python 3.2.3.
 
 [![Build Status](https://travis-ci.org/ascv/HLL.png?branch=master)](https://travis-ci.org/ascv/HLL)
 
-v0.72
+v0.8
 
 ## Setup ##
 
