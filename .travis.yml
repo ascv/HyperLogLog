@@ -3,5 +3,5 @@ python:
   - "3.3"
   - "3.2"
   - "2.7"
-install: python setup.py install
+install: sudo python setup.py install
 script:  python test.py
