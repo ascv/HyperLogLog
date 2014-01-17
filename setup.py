@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 setup(
     name="HLL", 
-    version="0.8", 
+    version="0.83", 
     description='The Hyper LogLog algorithm written in C.',
     author="Joshua Andersen",
     url='https://github.com/ascv/HLL',
