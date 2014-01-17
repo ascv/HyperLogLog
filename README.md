@@ -5,7 +5,7 @@ python 3.x.
 
 [![Build Status](https://travis-ci.org/ascv/HLL.png?branch=master)](https://travis-ci.org/ascv/HLL)
 
-v0.8
+v0.82
 
 ## Setup ##
 
@@ -14,7 +14,11 @@ you can install this package using:
 
     sudo apt-get install python-dev
 
-Now install using setup.py:
+Now install using pip:
+    
+    pip install HLL
+
+Alternatively, install using setup.py:
 
     sudo python setup.py install
 
@@ -32,20 +36,20 @@ Now install using setup.py:
 
 Create a new HyperLogLog using 2^<i>k</i> registers, <i>k</i> must be in the 
 range [2, 16]. Set <i>seed</i> to determine the seed value for the Murmur3 
-hash. The default value is 314.
+hash. The default value is 314 (chosen arbitrarily).
 
 * * *
 
 ##### add(<i>data</i>)
 
 Adds <i>data</i> to the estimator where <i>data</i> is a string, buffer, or bytes
-(python 3.x). 
+type.
 
 ##### merge(<i>HyperLogLog</i>)
 
-Merges another HyperLogLog object. Merging takes the maximum value for each
+Merges another HyperLogLog. Merging takes the maximum value for each
 register and sets the current HyperLogLog's register to that value. The registers
-of the merging object are unaffected. 
+of the other HyperLogLog are unaffected. 
 
 ##### murmur3_hash(<i>data [,seed]</i>)
 
