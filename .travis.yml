@@ -3,5 +3,5 @@ python:
   - "3.3"
   - "3.2"
   - "2.7"
-install: sudo python setup.py install
+install: pip install HLL
 script:  python test.py
