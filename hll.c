@@ -200,7 +200,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     uint32_t i;
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] < hllRegisters[i])
-	    self->registers[i] = hllRegisters[i];
+	        self->registers[i] = hllRegisters[i];
     }
 
     //free(hllRegisters);
