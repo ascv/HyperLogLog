@@ -3,7 +3,7 @@ cardinality of extraordinarily large data sets. This module provides an
 implementation, written in C using a Murmur3 hash, for python 2.7.x or 
 python 3.x.
 
-[![Build Status](https://travis-ci.org/ascv/HLL.png?branch=master)](https://travis-ci.org/ascv/HLL)
+[![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)](https://travis-ci.org/ascv/HyperLogLog)
 
 v0.831
 
