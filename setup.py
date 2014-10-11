@@ -1,13 +1,25 @@
 from distutils.core import setup, Extension
 
 setup(
-    name="HLL", 
-    version="0.831", 
+    name='HLL',
+    version='0.833',
     description='HyperLogLog implementation in C.',
-    author="Joshua Andersen",
-    url='https://github.com/ascv/HLL',
+    author='Joshua Andersen',
+    author_email='anderj0@uw.edu',
+    maintainer='Joshua Andersen',
+    maintainer_email='anderj0@uw.edu',
+    url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
-        Extension("HLL", ["hll.c", "murmur3.c"]),
+        Extension('HLL', ['hll.c', 'murmur3.c']),
     ],
-    headers=['hll.h','murmur3.h']
+    headers=['hll.h','murmur3.h'],
+    long_description=\
+"""
+The HyperLogLog algorithm [1] is a space efficient method to estimate the
+cardinality of extraordinarily large data sets. This module provides an
+implementation, written in C using a Murmur3 hash, for python 2.7.x or 
+python 3.x.
+
+[1] http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf
+"""
 )
