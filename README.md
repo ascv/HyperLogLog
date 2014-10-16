@@ -5,7 +5,7 @@ python 3.x.
 
 [![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)](https://travis-ci.org/ascv/HyperLogLog)
 
-v0.833
+v0.84
 
 ## Setup ##
 
