@@ -17,11 +17,11 @@ static void
 HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
-#if PY_MAJOR_VERSION >= 3
+    #if PY_MAJOR_VERSION >= 3
     Py_TYPE(self)->tp_free((PyObject*) self);
-#else
+    #else
     self->ob_type->tp_free((PyObject*) self);
-#endif
+    #endif
 }
 
 static PyObject *
@@ -183,11 +183,11 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 
     PyObject *size = PyObject_CallMethod(hll, "size", NULL);
 
-#if PY_MAJOR_VERSION >= 3
+    #if PY_MAJOR_VERSION >= 3
     long hllSize = PyLong_AsLong(size);
-#else
+    #else
     long hllSize = PyInt_AS_LONG(size);
-#endif
+    #endif
 
     if (hllSize != self->size) {
         PyErr_SetString(PyExc_ValueError, "HyperLogLogs must be the same size");
@@ -309,12 +309,12 @@ static PyMethodDef HyperLogLog_methods[] = {
 };
 
 static PyTypeObject HyperLogLogType = {
-#if PY_MAJOR_VERSION >= 3
+    #if PY_MAJOR_VERSION >= 3
     PyVarObject_HEAD_INIT(NULL, 0)
-#else
+    #else
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
-#endif
+    #endif
     "HLL.HyperLogLog",         /*tp_name*/
     sizeof(HyperLogLog),       /*tp_basicsize*/
     0,                         /*tp_itemsize*/
@@ -383,32 +383,32 @@ PyMODINIT_FUNC initHLL(void)
     PyObject* m;
     if (PyType_Ready(&HyperLogLogType) < 0) {
 
-#if PY_MAJOR_VERSION >= 3
+    #if PY_MAJOR_VERSION >= 3
         return NULL;
     }
 
     m = PyModule_Create(&HyperLogLogmodule);
-#else
+    #else
         return;
     }
 
     char *description = "HyperLogLog cardinality estimator.";
     m = Py_InitModule3("HLL", module_methods, description);
-#endif
+    #endif
 
     if (m == NULL)
-#if PY_MAJOR_VERSION >= 3
+        #if PY_MAJOR_VERSION >= 3
         return NULL;
-#else
+        #else
         return;
-#endif
+        #endif
 
     Py_INCREF(&HyperLogLogType);
     PyModule_AddObject(m, "HyperLogLog", (PyObject *)&HyperLogLogType);
 
-#if PY_MAJOR_VERSION >= 3
+    #if PY_MAJOR_VERSION >= 3
     return m;
-#endif
+    #endif
 }
 
 /* 
