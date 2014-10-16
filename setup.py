@@ -12,7 +12,8 @@ setup(
     ext_modules=[
         Extension('HLL', ['hll.c', 'murmur3.c']),
     ],
-    headers=['hll.h','murmur3.h'],
+    headers=['hll.h', 'murmur3.h'],
+    keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'probablistic counting'],
     long_description=\
 """
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
