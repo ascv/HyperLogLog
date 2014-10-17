@@ -193,6 +193,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         PyErr_SetString(PyExc_ValueError, "HyperLogLogs must be the same size");
         return NULL;
     }
+    Py_DECREF(size);
 
     PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
     char *hllRegisters = PyByteArray_AsString(hllByteArray);
@@ -202,8 +203,8 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         if (self->registers[i] < hllRegisters[i])
 	        self->registers[i] = hllRegisters[i];
     }
+    Py_DECREF(hllByteArray);
 
-    //free(hllRegisters);
     Py_INCREF(Py_None);
     return Py_None;
 } 
