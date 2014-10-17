@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='0.84',
+    version='0.9',
     description='HyperLogLog implementation in C.',
     author='Joshua Andersen',
     author_email='anderj0@uw.edu',
