@@ -55,7 +55,7 @@ HyperLogLog are unaffected.
 
     murmur3_hash(data, seed=314)
 
-Gets a signed integer from a Murmur3 hash of data where *data* is a 
+Gets a signed integer from a Murmur3 hash of *data* where *data* is a 
 string, buffer, or bytes (python 3.x). Set *seed* to determine the seed
 value for the Murmur3 hash. The default value was chosen arbitrarily.
 
