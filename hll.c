@@ -226,8 +226,8 @@ HyperLogLog_registers(HyperLogLog *self)
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 {
-    const uint32_t index;
-    const uint32_t rank;
+    const int32_t index;
+    const int32_t rank;
 
     if (!PyArg_ParseTuple(args, "ii", &index, &rank))
         return NULL;
