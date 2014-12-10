@@ -18,7 +18,7 @@ you can install this package using:
 
 Now install using pip:
     
-    sudo pip install HLL==0.9.2
+    sudo pip install HLL
 
 Alternatively, install using setup.py:
 
