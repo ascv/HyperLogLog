@@ -3,5 +3,5 @@ python:
   - "3.3"
   - "3.2"
   - "2.7"
-install: pip install HLL
+install: pip install HLL==0.91
 script:  python test.py
