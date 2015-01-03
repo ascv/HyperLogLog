@@ -7,7 +7,7 @@
 
 typedef struct {
     PyObject_HEAD
-    short int k;      /* power, size = 2^k */
+    short int k;      /* size = 2^k */
     uint32_t seed;    /* Murmur3 Hash seed value */
     uint32_t size;    /* number of registers */
     char * registers; /* array of ranks */
@@ -209,6 +209,18 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     return Py_None;
 } 
 
+/* Support for pickling, called when HyperLogLog is serialized. */
+static PyObject *
+HyperLogLog_reduce(HyperLogLog *self)
+{
+
+    PyObject * args = Py_BuildValue("(i)", self->k);
+    PyObject * registers; 
+    registers = PyByteArray_FromStringAndSize(self->registers, self->size);
+
+    return Py_BuildValue("(ON)", Py_TYPE(self), args, registers); 
+}
+
 /*
  * Gets a copy of the registers as a bytesarray.
  */
@@ -263,6 +275,21 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 
 }
 
+/* Support for pickling, called when HyperLogLog is de-serialized. */
+static PyObject *
+HyperLogLog_set_state(HyperLogLog *self, PyObject * args)
+{
+    char * registers = self->registers;
+    const uint32_t size;
+
+    if (!PyArg_ParseTuple(args, "s#:set_state", &registers, &size))
+        return NULL;
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+
 /*
  * Gets the seed.
  */
@@ -290,19 +317,24 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
      "Merge another HyperLogLog object with the current HyperLogLog."
-     },
+    },
     {"murmur3_hash", (PyCFunction)HyperLogLog_murmur3_hash, METH_VARARGS,
      "Gets a Murmur3 hash"
-     },
+    },
+    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS, 
+     "Support method for pickling."
+    }, 
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
      "Get a copy of the registers as a bytearray."
-     },
+    },
     {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS, 
      "Get the seed used in the Murmur3 hash."
-     },
+    },
     {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
      "Set the register at a zero-based index to the specified rank." 
-     },
+    },
+    {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS, 
+    "Support method for pickling."},
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
      "Returns the number of registers."
     },
