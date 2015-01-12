@@ -56,16 +56,11 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     return 0; 
 }
 
-/*
- * Instance members of type HyperLogLog.
- */
 static PyMemberDef HyperLogLog_members[] = { 
     {NULL} /* Sentinel */
 };
 
-/*
- * Adds an element to the cardinality estimator.
- */
+/* Adds an element to the cardinality estimator. */
 static PyObject *
 HyperLogLog_add(HyperLogLog *self, PyObject *args)
 {
@@ -94,9 +89,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     return Py_None;
 };
 
-/*
- * Gets a cardinality estimate.
- */
+/* Gets a cardinality estimate. */
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
@@ -152,8 +145,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
     return Py_BuildValue("d", estimate);
 }
 
-/*
- * Get a Murmur3 hash of a python string, buffer or bytes (python 3.x) as an unsigned 
+/* Get a Murmur3 hash of a python string, buffer or bytes (python 3.x) as an unsigned 
  * integer.
  */
 static PyObject *
@@ -170,8 +162,7 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
     return Py_BuildValue("i", *hash);
 }
 
-/*
- * Merges another HyperLogLog into the current HyperLogLog. The registers of
+/* Merges another HyperLogLog into the current HyperLogLog. The registers of
  * the other HyperLogLog are unaffected.
  */
 static PyObject *
@@ -221,9 +212,7 @@ HyperLogLog_reduce(HyperLogLog *self)
     return Py_BuildValue("(ON)", Py_TYPE(self), args, registers); 
 }
 
-/*
- * Gets a copy of the registers as a bytesarray.
- */
+/* Gets a copy of the registers as a bytesarray. */
 static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
@@ -232,9 +221,7 @@ HyperLogLog_registers(HyperLogLog *self)
     return registers;
 }
 
-/*
- * Sets register at index to rank.
- */
+/* Sets register at index to rank. */
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 {
@@ -289,18 +276,14 @@ HyperLogLog_set_state(HyperLogLog *self, PyObject * args)
     return Py_None;
 }
 
-/*
- * Gets the seed.
- */
+/* Gets the seed value used in the Murmur hash. */
 static PyObject *
 HyperLogLog_seed(HyperLogLog* self)
 {
     return Py_BuildValue("i", self->seed);
 }
 
-/*
- * Gets the number of registers.
- */
+/* Gets the number of registers. */
 static PyObject *
 HyperLogLog_size(HyperLogLog* self)
 {
@@ -443,9 +426,7 @@ PyMODINIT_FUNC initHLL(void)
     #endif
 }
 
-/* 
- * Get the number of leading zeros.
- */
+/* Get the number of leading zeros. */
 uint32_t leadingZeroCount(uint32_t x) {
   x |= (x >> 1);
   x |= (x >> 2);
@@ -455,9 +436,7 @@ uint32_t leadingZeroCount(uint32_t x) {
   return (32 - ones(x));
 }
 
-/*
- * Get the number of bits set to 1.
- */
+/* Get the number of bits set to 1. */
 uint32_t ones(uint32_t x) {
   x -= (x >> 1) & 0x55555555;
   x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
