@@ -5,6 +5,7 @@ setup(
     version='0.93',
     description='HyperLogLog implementation in C.',
     author='Joshua Andersen',
+    author_email='anderj0@uw.edu',
     maintainer='Joshua Andersen',
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
