@@ -2,12 +2,10 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='0.91',
+    version='0.93',
     description='HyperLogLog implementation in C.',
     author='Joshua Andersen',
-    author_email='anderj0@uw.edu',
     maintainer='Joshua Andersen',
-    maintainer_email='anderj0@uw.edu',
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
         Extension('HLL', ['hll.c', 'murmur3.c']),
