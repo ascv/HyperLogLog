@@ -207,7 +207,7 @@ HyperLogLog_reduce(HyperLogLog *self)
 
     PyObject * args = Py_BuildValue("(i)", self->k);
     PyObject * registers; 
-    registers = PyByteArray_FromStringAndSize(self->registers, self->size);
+    registers = Py_BuildValue("s",self->registers);
 
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers); 
 }
@@ -264,18 +264,8 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 
 /* Support for pickling, called when HyperLogLog is de-serialized. */
 static PyObject *
-HyperLogLog_get_state(HyperLogLog *self)
-{
-    PyObject* registers;
-    registers = PyByteArray_FromStringAndSize(self->registers, self->size);
-    return registers;
-}
-
-/* Support for pickling, called when HyperLogLog is de-serialized. */
-static PyObject *
 HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 {
-//    PyErr_SetString(PyExc_TypeError, "state is not a dictionary");
     char * registers;
     const uint32_t size;
 
@@ -327,7 +317,6 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
      "Set the register at a zero-based index to the specified rank." 
     },
-    {"__getstate__", (PyCFunction)HyperLogLog_get_state, METH_NOARGS, "asdf"},
     {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS, 
     "Support method for pickling."},
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
