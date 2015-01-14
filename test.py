@@ -145,7 +145,7 @@ class TestRegisterFunctions(unittest.TestCase):
 
     def test_set_register_with_greater_than_max_rank_fails(self):
         with self.assertRaises(ValueError):
-            self.hll.set_register(0, 17)
+            self.hll.set_register(0, 33)
 
     def test_set_register_with_index_out_of_bounds(self):
         with self.assertRaises(IndexError):
