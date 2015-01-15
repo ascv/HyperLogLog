@@ -1,5 +1,6 @@
 from HLL import HyperLogLog
 from random import randint
+import pickle
 import unittest
 import sys
 
@@ -26,7 +27,6 @@ class TestAdd(unittest.TestCase):
             self.hll.add(b'asdf')
         except Exception as ex:
             self.fail('failed to add bytes: %s' % ex)
-
 
 class TestCardinalityEstimation(unittest.TestCase):
 
@@ -125,6 +125,23 @@ class TestMerging(unittest.TestCase):
 
         hll.merge(hll2)
         self.assertEqual(hll.registers(), expected)
+
+class TestPickling(unittest.TestCase):
+
+    def setUp(self):
+        self.hll = HyperLogLog(12, seed=123)
+        for i in range(1000000): self.hll.add(str(i))
+
+    def test_pickle(self):
+        expected = self.hll.cardinality()
+        hll2 = pickle.loads(pickle.dumps(self.hll))
+        self.assertEqual(expected, hll2.cardinality())
+
+    @unittest.skip('cPickle does not import on travis, import before enabling')
+    def test_cPickle(self):
+        expected = self.hll.cardinality()
+        hll2 = cPickle.loads(cPickle.dumps(self.hll))
+        self.assertEqual(expected, hll2.cardinality())
 
 class TestRegisterFunctions(unittest.TestCase):
 
