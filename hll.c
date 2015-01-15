@@ -267,11 +267,8 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
     char * registers;
     if (!PyArg_ParseTuple(state, "s:setstate", &registers))
         return NULL;
-
-    int i; 
-    for (i = 0; i < self->size; i++) {
-        self->registers[i] = registers[i];
-    }
+    
+    memcpy(self->registers, registers, self->size);
 
     Py_INCREF(Py_None);
     return Py_None;
