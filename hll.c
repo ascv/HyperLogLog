@@ -204,7 +204,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_reduce(HyperLogLog *self)
 {
-    PyObject * args = Py_BuildValue("(i)", self->k);
+    PyObject * args = Py_BuildValue("(ii)", self->k, self->seed);
     PyObject * registers = Py_BuildValue("s", self->registers);
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers);
 }
