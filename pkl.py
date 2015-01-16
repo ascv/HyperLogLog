@@ -2,9 +2,13 @@ from HLL import HyperLogLog
 import binascii
 import pickle
 
-hll = HyperLogLog(5)
-hll.add('hello')
-hll.add('world')
+hll = HyperLogLog(2)
+hll.set_register(0, 1)
+hll.set_register(1, 1)
+hll.set_register(2,1)
+hll.set_register(3,1)
+
+print hll.__reduce__()
 
 print "pickling..."
 print hll.cardinality()

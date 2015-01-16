@@ -206,10 +206,14 @@ HyperLogLog_reduce(HyperLogLog *self)
 {
 
     PyObject * args = Py_BuildValue("(i)", self->k);
-    PyObject * registers; 
-    registers = Py_BuildValue("s",self->registers);
-
+    PyObject * registers = PyByteArray_FromStringAndSize(self->registers, self->size);
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers); 
+}
+
+static PyObject *
+HyperLogLog_debug(HyperLogLog * self)
+{
+    return Py_BuildValue("s", self->registers);
 }
 
 /* Gets a copy of the registers as a bytesarray. */
@@ -266,14 +270,17 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 {
+
     char * registers;
-    const uint32_t size;
+    registers = PyByteArray_AsString(state);
+    self->registers[1] = registers[1];
+    //self->registers = registers;
+    /*
 
-    if (!PyArg_ParseTuple(state, "s#:set_state", &registers, &size))
-        return NULL;
-
-    memmove(self->registers, registers, size);
-
+    int i;
+    for (i = 0; i < self->size; i++) {
+        self->registers[i] = registers[i];
+    }*/
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -293,6 +300,7 @@ HyperLogLog_size(HyperLogLog* self)
 }
 
 static PyMethodDef HyperLogLog_methods[] = {
+    {"debug", (PyCFunction) HyperLogLog_debug, METH_NOARGS, "debugging method"},
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element."
     },
