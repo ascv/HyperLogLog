@@ -204,8 +204,20 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_reduce(HyperLogLog *self)
 {
-    PyObject * args = Py_BuildValue("(ii)", self->k, self->seed);
-    PyObject * registers = Py_BuildValue("s", self->registers);
+
+    char *arr = (char *) malloc(self->size * sizeof(char));
+
+    int i;
+    for (i = 0; i < self->size; i++) {
+        if (self->registers[i] == 0) {
+            arr[i] = 'Z'; /* pickle doesn't allow null bytes in strings */
+        } else {
+            arr[i] = self->registers[i];
+        }
+    }
+
+    PyObject *args = Py_BuildValue("(ii)", self->k, self->seed);
+    PyObject *registers = Py_BuildValue("s", arr);
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers);
 }
 
@@ -213,7 +225,7 @@ HyperLogLog_reduce(HyperLogLog *self)
 static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
-    PyObject* registers;
+    PyObject *registers;
     registers = PyByteArray_FromStringAndSize(self->registers, self->size);
     return registers;
 }
@@ -259,26 +271,33 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
 
 }
 
-/* Support for pickling, called when HyperLogLog is de-serialized. */
-static PyObject *
-HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
-{
-
-    char * registers;
-    if (!PyArg_ParseTuple(state, "s:setstate", &registers))
-        return NULL;
-    
-    memcpy(self->registers, registers, self->size);
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 /* Gets the seed value used in the Murmur hash. */
 static PyObject *
 HyperLogLog_seed(HyperLogLog* self)
 {
     return Py_BuildValue("i", self->seed);
+}
+
+/* Support for pickling, called when HyperLogLog is de-serialized. */
+static PyObject *
+HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
+{
+
+    char *registers;
+    if (!PyArg_ParseTuple(state, "s:setstate", &registers))
+        return NULL;
+
+    int i;
+    for (i = 0; i < self->size; i++) {
+        if (registers[i] == 'Z') {
+            self->registers[i] = 0;
+        } else {
+            self->registers[i] = registers[i];
+        }
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 /* Gets the number of registers. */
