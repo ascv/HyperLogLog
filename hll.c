@@ -210,14 +210,14 @@ HyperLogLog_reduce(HyperLogLog *self)
     int i;
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] == 0) {
-            arr[i] = 'Z'; /* pickle doesn't allow null bytes in strings */
+            arr[i] = 'z'; /* pickle doesn't allow null bytes in strings */
         } else {
             arr[i] = self->registers[i];
         }
     }
 
     PyObject *args = Py_BuildValue("(ii)", self->k, self->seed);
-    PyObject *registers = Py_BuildValue("s", arr);
+    PyObject *registers = Py_BuildValue("s#", arr, self->size);
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers);
 }
 
@@ -289,7 +289,7 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 
     int i;
     for (i = 0; i < self->size; i++) {
-        if (registers[i] == 'Z') {
+        if (registers[i] == 'z') {
             self->registers[i] = 0;
         } else {
             self->registers[i] = registers[i];
