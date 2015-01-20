@@ -145,8 +145,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
     return Py_BuildValue("d", estimate);
 }
 
-/* Get a Murmur3 hash of a python string, buffer or bytes (python 3.x) as an unsigned 
- * integer.
+/* Get a Murmur3 hash of a python string, buffer or bytes (python 3.x) as an
+ * unsigned integer.
  */
 static PyObject *
 HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
@@ -207,10 +207,14 @@ HyperLogLog_reduce(HyperLogLog *self)
 
     char *arr = (char *) malloc(self->size * sizeof(char));
 
+    /* Pickle protocol 2, used in python 2.x, doesn't allow null bytes in
+     * strings and does not support pickling bytearrays. For backwards
+     * compatibility, we set all null bytes to 'z' before pickling.
+     */
     int i;
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] == 0) {
-            arr[i] = 'z'; /* pickle doesn't allow null bytes in strings */
+            arr[i] = 'z';
         } else {
             arr[i] = self->registers[i];
         }
