@@ -92,7 +92,7 @@ class TestHyperLogLogConstructor(unittest.TestCase):
         for register in registers:
             self.assertEqual(register, 0)
 
-    def test_k_param_correctly_determines_the_number_of_registers(self):
+    def test_k_param_determines_the_number_of_registers(self):
         hll = HyperLogLog(5)
         self.assertEqual(len(hll.registers()), 32)
         self.assertEqual(hll.size(), 32)
@@ -135,7 +135,6 @@ class TestPickling(unittest.TestCase):
         for hll, n in zip(hlls, cardinalities):
             for i in range(1, n):
                 hll.add(str(i))
-
         self.hlls = hlls
 
     def test_pickled_cardinality(self):
@@ -155,7 +154,6 @@ class TestPickling(unittest.TestCase):
             expected = hll.registers()
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(expected, hll2.registers())
-
 
     def test_pickled_size(self):
          for hll in self.hlls:
@@ -193,7 +191,7 @@ class TestRegisterFunctions(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hll.set_register(0, -1)
 
-    def test_bytesarray_returned_from_registers_contains_correct_values(self):
+    def test_bytesarray_has_correct_values(self):
         expected = bytearray(32)
         for i in range(31):
             expected[i] = randint(0, 16)
@@ -208,7 +206,7 @@ class TestRegisterFunctions(unittest.TestCase):
     def test_registers_returns_bytesarray(self):
         self.assertTrue(type(self.hll.registers()) is bytearray)
 
-    def test_registers_returns_correct_length_bytearray(self):
+    def test_bytesarray_has_correct_length(self):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
 if __name__ == '__main__':
