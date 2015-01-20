@@ -129,19 +129,39 @@ class TestMerging(unittest.TestCase):
 class TestPickling(unittest.TestCase):
 
     def setUp(self):
-        self.hll = HyperLogLog(12, seed=123)
-        for i in range(1000000): self.hll.add(str(i))
+        hlls = [HyperLogLog(x, randint(1, 1000)) for x in range(4, 16)]
+        cardinalities = [x**5 for x in range(1, 16)]
 
-    def test_pickle(self):
-        expected = self.hll.cardinality()
-        hll2 = pickle.loads(pickle.dumps(self.hll))
-        self.assertEqual(expected, hll2.cardinality())
+        for hll, n in zip(hlls, cardinalities):
+            for i in range(1, n):
+                hll.add(str(i))
 
-    @unittest.skip('cPickle does not import on travis, import before enabling')
-    def test_cPickle(self):
-        expected = self.hll.cardinality()
-        hll2 = cPickle.loads(cPickle.dumps(self.hll))
-        self.assertEqual(expected, hll2.cardinality())
+        self.hlls = hlls
+
+    def test_pickled_cardinality(self):
+        for hll in self.hlls:
+            expected = hll.cardinality()
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(expected, hll2.cardinality())
+
+    def test_pickled_seed(self):
+        for hll in self.hlls:
+            expected = hll.seed()
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(expected, hll2.seed())
+
+    def test_pickled_registers(self):
+        for hll in self.hlls:
+            expected = hll.registers()
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(expected, hll2.registers())
+
+
+    def test_pickled_size(self):
+         for hll in self.hlls:
+            expected = hll.size()
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(expected, hll2.size())
 
 class TestRegisterFunctions(unittest.TestCase):
 
