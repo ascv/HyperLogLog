@@ -70,17 +70,17 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
         return NULL;
 
-    uint32_t *hash = (uint32_t *) malloc(sizeof(uint32_t));
+    uint32_t hash;
     uint32_t index;
     uint32_t rank;
 
-    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
+    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) &hash);
 
     /* use the first k bits as a zero based index */
-    index = (*hash >> (32 - self->k));
+    index = (hash >> (32 - self->k));
 
     /* compute the rank of the remaining 32 - k bits */
-    rank = leadingZeroCount((*hash << self->k) >> self->k) - self->k + 1;
+    rank = leadingZeroCount((hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
         self->registers[index] = rank;
