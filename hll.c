@@ -8,9 +8,9 @@
 typedef struct {
     PyObject_HEAD
     short int k;      /* size = 2^k */
-    uint32_t seed;    /* Murmur3 Hash seed value */
+    uint32_t seed;    /* Murmur3 seed */
     uint32_t size;    /* number of registers */
-    char * registers; /* array of ranks */
+    char * registers; /* ranks */
 } HyperLogLog;
 
 static void
@@ -76,10 +76,10 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) &hash);
 
-    /* use the first k bits as a zero based index */
+    /* Use the first k bits as a zero based index */
     index = (hash >> (32 - self->k));
 
-    /* compute the rank of the remaining 32 - k bits */
+    /* Compute the rank, lzc + 1, of the remaining 32 - k bits */
     rank = leadingZeroCount((hash << self->k) >> self->k) - self->k + 1;
     
     if (rank > self->registers[index])
@@ -163,8 +163,8 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
 }
 
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
- * the other HyperLogLog are unaffected.
- */
+ * the other HyperLogLog are unaffected. 
+ */ 
 static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args) 
 {
