@@ -5,7 +5,7 @@ using a Murmur3 hash [2] for python 2.7.x or python 3.x.
 [![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)]
 (https://travis-ci.org/ascv/HyperLogLog)
 
-v0.99
+v 1.0
 
 Setup
 =====
@@ -69,6 +69,12 @@ Gets the seed value used in the Murmur3 hash.
     set_register(index, value)
 
 Sets the register at *index* to *value*. Indexing is zero-based.
+
+    set_registers(registers)
+
+Sets the registers to *new_registers*. If *new_registers* is too long then the
+extra new registers are ignored. If *new_registers* is too short then the extra
+registers are not modified.
 
     size()
 
