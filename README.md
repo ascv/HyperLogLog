@@ -72,8 +72,8 @@ Sets the register at *index* to *value*. Indexing is zero-based.
 
     set_registers(registers)
 
-Sets the registers to *new_registers*. If *new_registers* is longer then the
-extra new registers are ignored. If *new_registers* is shorter then the extra
+Sets the registers to *new_registers*. If *new_registers* is too long then the
+extra new registers are ignored. If *new_registers* is too short then the extra
 registers are not modified.
 
     size()
