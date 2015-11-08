@@ -283,7 +283,7 @@ HyperLogLog_seed(HyperLogLog* self)
     return Py_BuildValue("i", self->seed);
 }
 
-/* set all registers */
+/* Sets all the registers. */
 static PyObject *
 HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 {
@@ -294,7 +294,7 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 
     char* registers;
     registers = PyByteArray_AsString((PyObject*) regs);
-    
+
     int i;
     for (i = 0; i < self->size; i++) {
             self->registers[i] = registers[i];
@@ -302,7 +302,6 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 
     Py_INCREF(Py_None);
     return Py_None;
-    
 }
 
 /* Support for pickling, called when HyperLogLog is de-serialized. */
@@ -356,8 +355,8 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS, 
      "Get the seed used in the Murmur3 hash."
     },
-    {"set_registers", (PyCFunction)HyperLogLog_set_registers, METH_VARARGS, 
-     "Set the registers with a bytearray." 
+    {"set_registers", (PyCFunction)HyperLogLog_set_registers, METH_VARARGS,
+     "Set the registers with a bytearray."
     },
     {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
      "Set the register at a zero-based index to the specified rank." 
