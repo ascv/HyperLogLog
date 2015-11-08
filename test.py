@@ -209,5 +209,15 @@ class TestRegisterFunctions(unittest.TestCase):
     def test_bytesarray_has_correct_length(self):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
+    def test_set_registers(self):
+        expected = bytearray(32)
+        for i in range(31):
+            expected[i] = randint(0, 16)
+
+        self.hll.set_registers(expected)
+        registers=self.hll.registers()
+
+        self.assertEqual(expected, registers)
+
 if __name__ == '__main__':
     unittest.main()
