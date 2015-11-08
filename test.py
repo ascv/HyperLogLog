@@ -192,16 +192,12 @@ class TestRegisterFunctions(unittest.TestCase):
             self.hll.set_register(0, -1)
 
     def test_bytesarray_has_correct_values(self):
-        expected = bytearray(32)
-        for i in range(31):
-            expected[i] = randint(0, 16)
-
-        for i in range(31):
+        expected = bytearray(randint(0, 16) for x in range(32))
+        for i in range(32):
             self.hll.set_register(i, expected[i])
 
         registers = self.hll.registers()
-        for i in range(31):
-            self.assertEqual(expected[i], registers[i])
+        self.assertEqual(expected, registers)
 
     def test_registers_returns_bytesarray(self):
         self.assertTrue(type(self.hll.registers()) is bytearray)
@@ -210,13 +206,10 @@ class TestRegisterFunctions(unittest.TestCase):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
     def test_set_registers(self):
-        expected = bytearray(32)
-        for i in range(31):
-            expected[i] = randint(0, 16)
-
+        expected = bytearray(randint(0, 16) for x in range(32))
         self.hll.set_registers(expected)
-        registers=self.hll.registers()
 
+        registers=self.hll.registers()
         self.assertEqual(expected, registers)
 
 if __name__ == '__main__':
