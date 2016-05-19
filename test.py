@@ -39,8 +39,8 @@ class TestCardinalityEstimation(unittest.TestCase):
     def test_small_range_correction_not_all_registers_set_to_zero(self):
         self.hll.set_register(0, 1)
         c = self.hll.cardinality()
-        correction= 1.46571806761 <= c and c <= 1.46571806762
-        self.assertTrue(correction)
+        expected = 1.01 <= c and c <= 1.02
+        self.assertTrue(expected)
 
     def test_medium_range_no_correction(self):
         for i in range(32):

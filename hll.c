@@ -124,22 +124,22 @@ HyperLogLog_cardinality(HyperLogLog *self)
      
     if (estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
-	    uint32_t i;
+	uint32_t i;
 
-	    for (i = 0; i < self->size; i++) {
+	for (i = 0; i < self->size; i++) {
     	    if (self->registers[i] == 0) {
     	        zeros += 1;
             }
-	    }
+	}
    
         if (zeros != 0) {
             double size = (double) self->size;
-            estimate = size * log2(size / (double) zeros);
+            estimate = size * log(size / (double) zeros);
         }
     }
 
     if (estimate > (1.0/30.0) * two_32) {
-        estimate = neg_two_32 * log2(1.0 - estimate/two_32);
+        estimate = neg_two_32 * log(1.0 - estimate/two_32);
     }
 
     return Py_BuildValue("d", estimate);
@@ -184,6 +184,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         PyErr_SetString(PyExc_ValueError, "HyperLogLogs must be the same size");
         return NULL;
     }
+
     Py_DECREF(size);
 
     PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
@@ -194,6 +195,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         if (self->registers[i] < hllRegisters[i])
 	        self->registers[i] = hllRegisters[i];
     }
+
     Py_DECREF(hllByteArray);
 
     Py_INCREF(Py_None);
@@ -297,7 +299,7 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 
     int i;
     for (i = 0; i < self->size; i++) {
-            self->registers[i] = registers[i];
+        self->registers[i] = registers[i];
     }
 
     Py_INCREF(Py_None);
@@ -375,46 +377,46 @@ static PyTypeObject HyperLogLogType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     #else
     PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
+    0,                               /* ob_size */
     #endif
-    "HLL.HyperLogLog",         /*tp_name*/
-    sizeof(HyperLogLog),       /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)HyperLogLog_dealloc, /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/ 
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
+    "HLL.HyperLogLog",               /* tp_name */
+    sizeof(HyperLogLog),             /* tp_basicsize */
+    0,                               /* tp_itemsize */
+    (destructor)HyperLogLog_dealloc, /* tp_dealloc */
+    0,                               /* tp_print */
+    0,                               /* tp_getattr */
+    0,                               /* tp_setattr */
+    0,                               /* tp_compare */
+    0,                               /* tp_repr */
+    0,                               /* tp_as_number */
+    0,                               /* tp_as_sequence */
+    0,                               /* tp_as_mapping */
+    0,                               /* tp_hash */
+    0,                               /* tp_call */
+    0,                               /* tp_str */
+    0,                               /* tp_getattro */
+    0,                               /* tp_setattro */
+    0,                               /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | 
-        Py_TPFLAGS_BASETYPE,   /*tp_flags*/
-    "HyperLogLog object",      /* tp_doc */
-    0,		                   /* tp_traverse */
-    0,		                   /* tp_clear */
-    0,		                   /* tp_richcompare */
-    0,		                   /* tp_weaklistoffset */
-    0,		                   /* tp_iter */
-    0,		                   /* tp_iternext */
-    HyperLogLog_methods,       /* tp_methods */
-    HyperLogLog_members,       /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
+        Py_TPFLAGS_BASETYPE,         /* tp_flags */
+    "HyperLogLog object",            /* tp_doc */
+    0,		                     /* tp_traverse */
+    0,		                     /* tp_clear */
+    0,		                     /* tp_richcompare */
+    0,		                     /* tp_weaklistoffset */
+    0,		                     /* tp_iter */
+    0,		                     /* tp_iternext */
+    HyperLogLog_methods,             /* tp_methods */
+    HyperLogLog_members,             /* tp_members */
+    0,                               /* tp_getset */
+    0,                               /* tp_base */
+    0,                               /* tp_dict */
+    0,                               /* tp_descr_get */
+    0,                               /* tp_descr_set */
+    0,                               /* tp_dictoffset */
     (initproc)HyperLogLog_init,      /* tp_init */
-    0,                         /* tp_alloc */
-    HyperLogLog_new,           /* tp_new */
+    0,                               /* tp_alloc */
+    HyperLogLog_new,                 /* tp_new */
 };
 
 #if PY_MAJOR_VERSION >= 3
