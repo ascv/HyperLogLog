@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <Python.h>
 #include "structmember.h"
 #include "hll.h"
