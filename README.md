@@ -10,13 +10,19 @@ v 1.1
 Setup
 =====
 
-You will need the python development package. On Ubuntu/Mint
-you can install this package using:
+You will need the python development package. On Ubuntu, depending on your
+version of python, you can install this package using:
 
+    # python 2.7
     sudo apt-get install python-dev
 
+or:
+
+    # python 3
+    sudo apt-get install python3-dev
+
 Now install using pip:
-    
+
     sudo pip install HLL
 
 Alternatively, install using setup.py:
@@ -27,11 +33,11 @@ Quick start
 ===========
 
     from HLL import HyperLogLog
-    
+
     hll = HyperLogLog(5) # use 2^5 registers
     hll.add('some data')
     estimate = hll.cardinality()
-  
+
 Documentation
 =============
 
@@ -42,8 +48,8 @@ type.
 
     HyperLogLog(k, seed=314)
 
-Create a new HyperLogLog using 2^*k* registers, *k* must be in the 
-range [2, 16]. Set *seed* to determine the seed value for the Murmur3 
+Create a new HyperLogLog using 2^*k* registers, *k* must be in the
+range [2, 16]. Set *seed* to determine the seed value for the Murmur3
 hash. The default value was chosen arbitrarily.
 
     merge(hll)
@@ -54,7 +60,7 @@ HyperLogLog are unaffected.
 
     murmur3_hash(data, seed=314)
 
-Gets a signed integer from a Murmur3 hash of *data* where *data* is a 
+Gets a signed integer from a Murmur3 hash of *data* where *data* is a
 string, buffer, or bytes (python 3.x). Set *seed* to determine the seed
 value for the Murmur3 hash. The default value was chosen arbitrarily.
 
