@@ -69,7 +69,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     const uint32_t dataLength;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
-        return NULL;
+        return 0;
 
     uint32_t hash;
     uint32_t index;
