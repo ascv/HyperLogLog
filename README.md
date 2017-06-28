@@ -72,9 +72,8 @@ Sets the register at *index* to *value*. Indexing is zero-based.
 
     set_registers(registers)
 
-Sets the registers to *new_registers*. If *new_registers* is too long then the
-extra new registers are ignored. If *new_registers* is too short then the extra
-registers are not modified.
+Sets the registers to *registers*. Extra or missing registers in *registers* are
+ignored. This method can be used to restore a HyperLogLog from a bytearray.
 
     size()
 
