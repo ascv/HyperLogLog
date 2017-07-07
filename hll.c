@@ -1,17 +1,19 @@
-#include <stdint.h>
-#include <Python.h>
-#include "structmember.h"
-#include "hll.h"
-#include "murmur3.h"
 #include <math.h>
+#include <Python.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include "hll.h"
+#include "structmember.h"
+#include "murmur3.h"
 
 typedef struct {
     PyObject_HEAD
-    short int k;      /* size = 2^k */
-    uint32_t seed;    /* Murmur3 seed */
-    uint32_t size;    /* number of registers */
-    char * registers; /* ranks */
+    char * registers;          /* ranks */
+    double cache;              /* cached cardinality estimate */
+    unsigned short k;          /* size = 2^k */
+    unsigned short use_cache;  /* use cached result */
+    uint32_t seed;             /* Murmur3 seed */
+    uint32_t size;             /* number of registers */
 } HyperLogLog;
 
 static void
@@ -19,9 +21,9 @@ HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
     #if PY_MAJOR_VERSION >= 3
-    Py_TYPE(self)->tp_free((PyObject*) self);
+        Py_TYPE(self)->tp_free((PyObject*) self);
     #else
-    self->ob_type->tp_free((PyObject*) self);
+        self->ob_type->tp_free((PyObject*) self);
     #endif
 }
 
@@ -36,28 +38,30 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 static int
 HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
-{ 
+{
     static char *kwlist[] = {"k", "seed", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, 
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist,
 				      &self->k, &self->seed)) {
-        return -1; 
+        return -1;
     }
 
     if (self->k < 2 || self->k > 16) {
         char * msg = "Number of registers must be in the range [2^2, 2^16]";
         PyErr_SetString(PyExc_ValueError, msg);
 	return -1;
-    } 
+    }
 
     self->size = 1 << self->k;
-    self->registers = (char *) malloc(self->size * sizeof(char));
-    memset(self->registers, 0, self->size);
+    self->registers = (char *) calloc(self->size, sizeof(char));
 
-    return 0; 
+    self->cache = 0;
+    self->use_cache = 0;
+
+    return 0;
 }
 
-static PyMemberDef HyperLogLog_members[] = { 
+static PyMemberDef HyperLogLog_members[] = {
     {NULL} /* Sentinel */
 };
 
@@ -82,9 +86,11 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     /* Compute the rank, lzc + 1, of the remaining 32 - k bits */
     rank = leadingZeroCount((hash << self->k) >> self->k) - self->k + 1;
-    
-    if (rank > self->registers[index])
+
+    if (rank > self->registers[index]) {
         self->registers[index] = rank;
+        self->use_cache = 0;
+    }
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -94,10 +100,15 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
+
+    if (self->use_cache) {
+        return Py_BuildValue("d", self->cache);
+    }
+
     static const double two_32 = 4294967296.0;
     static const double neg_two_32 = -4294967296.0;
-
     double alpha = 0.0;
+
     switch (self->size) {
       case 16:
       	  alpha = 0.673;
@@ -112,17 +123,18 @@ HyperLogLog_cardinality(HyperLogLog *self)
 	      alpha = 0.7213/(1.0 + 1.079/(double) self->size);
           break;
     }
-  
+
     uint32_t i;
     double rank;
     double sum = 0.0;
+
     for (i = 0; i < self->size; i++) {
         rank = (double) self->registers[i];
         sum = sum + pow(2, -1*rank);
     }
-    
-    double estimate = alpha * (1/sum) * self->size * self->size;  
-     
+
+    double estimate = alpha * (1/sum) * self->size * self->size;
+
     if (estimate <= 2.5 * self->size) {
         uint32_t zeros = 0;
 	uint32_t i;
@@ -132,7 +144,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
     	        zeros += 1;
             }
 	}
-   
+
         if (zeros != 0) {
             double size = (double) self->size;
             estimate = size * log(size / (double) zeros);
@@ -142,6 +154,9 @@ HyperLogLog_cardinality(HyperLogLog *self)
     if (estimate > (1.0/30.0) * two_32) {
         estimate = neg_two_32 * log(1.0 - estimate/two_32);
     }
+
+    self->cache = estimate;
+    self->use_cache = 1;
 
     return Py_BuildValue("d", estimate);
 }
@@ -155,8 +170,9 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
     const char *data;
     const uint32_t dataLength;
 
-    if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLength)) {
         return NULL;
+    }
 
     uint32_t *hash = (uint32_t *) malloc(sizeof(uint32_t));
     MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
@@ -164,21 +180,22 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
 }
 
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
- * the other HyperLogLog are unaffected. 
- */ 
+ * the other HyperLogLog are unaffected.
+ */
 static PyObject *
-HyperLogLog_merge(HyperLogLog *self, PyObject * args) 
+HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 {
     PyObject *hll;
-    if (!PyArg_ParseTuple(args, "O", &hll)) //TODO: use O! to check type
+    if (!PyArg_ParseTuple(args, "O", &hll)) {
         return NULL;
+    }
 
     PyObject *size = PyObject_CallMethod(hll, "size", NULL);
 
     #if PY_MAJOR_VERSION >= 3
-    long hllSize = PyLong_AsLong(size);
+        long hllSize = PyLong_AsLong(size);
     #else
-    long hllSize = PyInt_AS_LONG(size);
+        long hllSize = PyInt_AS_LONG(size);
     #endif
 
     if (hllSize != self->size) {
@@ -193,15 +210,16 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 
     uint32_t i;
     for (i = 0; i < self->size; i++) {
-        if (self->registers[i] < hllRegisters[i])
-	        self->registers[i] = hllRegisters[i];
+        if (self->registers[i] < hllRegisters[i]) {
+            self->registers[i] = hllRegisters[i];
+        }
     }
 
     Py_DECREF(hllByteArray);
 
     Py_INCREF(Py_None);
     return Py_None;
-} 
+}
 
 /* Support for pickling, called when HyperLogLog is serialized. */
 static PyObject *
@@ -218,7 +236,9 @@ HyperLogLog_reduce(HyperLogLog *self)
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] == 0) {
             arr[i] = 'z';
-        } else {
+        }
+        
+        else {
             arr[i] = self->registers[i];
         }
     }
@@ -237,7 +257,6 @@ HyperLogLog_registers(HyperLogLog *self)
     return registers;
 }
 
-
 /* Sets register at index to rank. */
 static PyObject *
 HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
@@ -245,8 +264,9 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
     const int32_t index;
     const int32_t rank;
 
-    if (!PyArg_ParseTuple(args, "ii", &index, &rank))
+    if (!PyArg_ParseTuple(args, "ii", &index, &rank)) {
         return NULL;
+    }
 
     if (index < 0) {
         char * msg = "Index is negative.";
@@ -292,8 +312,9 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 {
     PyByteArrayObject *regs;
 
-    if (!PyArg_ParseTuple(args, "O", &regs))
+    if (!PyArg_ParseTuple(args, "O", &regs)) {
         return NULL;
+    }
 
     char* registers;
     registers = PyByteArray_AsString((PyObject*) regs);
@@ -313,8 +334,9 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 {
 
     char *registers;
-    if (!PyArg_ParseTuple(state, "s:setstate", &registers))
+    if (!PyArg_ParseTuple(state, "s:setstate", &registers)) {
         return NULL;
+    }
 
     int i;
     for (i = 0; i < self->size; i++) {
@@ -349,25 +371,25 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"murmur3_hash", (PyCFunction)HyperLogLog_murmur3_hash, METH_VARARGS,
      "Gets a Murmur3 hash"
     },
-    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS, 
+    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization function for pickling."
     }, 
-    {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS, 
+    {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
      "Get a copy of the registers as a bytearray."
     },
-    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS, 
+    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
      "Get the seed used in the Murmur3 hash."
     },
     {"set_registers", (PyCFunction)HyperLogLog_set_registers, METH_VARARGS,
      "Set the registers with a bytearray."
     },
-    {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS, 
-     "Set the register at a zero-based index to the specified rank." 
+    {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS,
+     "Set the register at a zero-based index to the specified rank."
     },
-    {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS, 
+    {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS,
     "De-serialization function for pickling."
     },
-    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS, 
+    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
      "Returns the number of registers."
     },
     {NULL}  /* Sentinel */
@@ -375,9 +397,9 @@ static PyMethodDef HyperLogLog_methods[] = {
 
 static PyTypeObject HyperLogLogType = {
     #if PY_MAJOR_VERSION >= 3
-    PyVarObject_HEAD_INIT(NULL, 0)
+        PyVarObject_HEAD_INIT(NULL, 0)
     #else
-    PyObject_HEAD_INIT(NULL)
+        PyObject_HEAD_INIT(NULL)
     0,                               /* ob_size */
     #endif
     "HLL.HyperLogLog",               /* tp_name */
@@ -398,7 +420,7 @@ static PyTypeObject HyperLogLogType = {
     0,                               /* tp_getattro */
     0,                               /* tp_setattro */
     0,                               /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | 
+    Py_TPFLAGS_DEFAULT |
         Py_TPFLAGS_BASETYPE,         /* tp_flags */
     "HyperLogLog object",            /* tp_doc */
     0,		                     /* tp_traverse */
@@ -421,77 +443,79 @@ static PyTypeObject HyperLogLogType = {
 };
 
 #if PY_MAJOR_VERSION >= 3
-static PyModuleDef HyperLogLogmodule = {
-    PyModuleDef_HEAD_INIT,
-    "HyperLogLog",
-    "A space efficient cardinality estimator.",
-    -1,
-    NULL, NULL, NULL, NULL, NULL
-};
-
+    static PyModuleDef HyperLogLogmodule = {
+        PyModuleDef_HEAD_INIT,
+        "HyperLogLog",
+        "A space efficient cardinality estimator (v1.2).",
+        -1,
+        NULL, NULL, NULL, NULL, NULL
+    };
 #else
-static PyMethodDef module_methods[] = {
-    {NULL}  /* Sentinel */
-};
+    static PyMethodDef module_methods[] = {
+        {NULL}  /* Sentinel */
+    };
 #endif
 
 #if PY_MAJOR_VERSION >=3
-PyMODINIT_FUNC
-PyInit_HLL(void)
+    PyMODINIT_FUNC
+    PyInit_HLL(void)
 #else
-    #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+    /* declarations for DLL import/export */
+    #ifndef PyMODINIT_FUNC
         #define PyMODINIT_FUNC void
     #endif
-PyMODINIT_FUNC initHLL(void) 
+    PyMODINIT_FUNC initHLL(void)
 #endif
+
 {
     PyObject* m;
-    if (PyType_Ready(&HyperLogLogType) < 0) {
-
     #if PY_MAJOR_VERSION >= 3
-        return NULL;
-    }
+        if (PyType_Ready(&HyperLogLogType) < 0) {
+            return NULL;
+        }
 
-    m = PyModule_Create(&HyperLogLogmodule);
+        m = PyModule_Create(&HyperLogLogmodule);
+
+        if (m == NULL) {
+            return NULL;
+        }
     #else
-        return;
-    }
+        if (PyType_Ready(&HyperLogLogType) < 0) {
+            return;
+        }
 
-    char *description = "HyperLogLog cardinality estimator.";
-    m = Py_InitModule3("HLL", module_methods, description);
+        char *description = "HyperLogLog cardinality estimator.";
+        m = Py_InitModule3("HLL", module_methods, description);
+
+        if (m == NULL) {
+            return;
+        }
     #endif
-
-    if (m == NULL)
-        #if PY_MAJOR_VERSION >= 3
-        return NULL;
-        #else
-        return;
-        #endif
 
     Py_INCREF(&HyperLogLogType);
     PyModule_AddObject(m, "HyperLogLog", (PyObject *)&HyperLogLogType);
 
     #if PY_MAJOR_VERSION >= 3
-    return m;
+        return m;
     #endif
 }
 
 /* Get the number of leading zeros. */
 uint32_t leadingZeroCount(uint32_t x) {
-  x |= (x >> 1);
-  x |= (x >> 2);
-  x |= (x >> 4);
-  x |= (x >> 8);
-  x |= (x >> 16);
-  return (32 - ones(x));
+    x |= (x >> 1);
+    x |= (x >> 2);
+    x |= (x >> 4);
+    x |= (x >> 8);
+    x |= (x >> 16);
+    return (32 - ones(x));
 }
 
 /* Get the number of bits set to 1. */
 uint32_t ones(uint32_t x) {
-  x -= (x >> 1) & 0x55555555;
-  x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
-  x = ((x >> 4) + x) & 0x0F0F0F0F;
-  x += (x >> 8);
-  x += (x >> 16);
-  return(x & 0x0000003F);
+    x -= (x >> 1) & 0x55555555;
+    x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
+    x = ((x >> 4) + x) & 0x0F0F0F0F;
+    x += (x >> 8);
+    x += (x >> 16);
+    return(x & 0x0000003F);
 }
