@@ -10,8 +10,8 @@ v 1.2
 Setup
 =====
 
-You will need the python development package. On Ubuntu, depending on your
-version of python, you can install this package using:
+You will need the python development package. On Ubuntu, you can install this
+package using:
 
     # python 2.7
     sudo apt-get install python-dev

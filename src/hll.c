@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "hll.h"
 #include "structmember.h"
-#include "murmur3.h"
+#include "../lib/murmur3.h"
 
 typedef struct {
     PyObject_HEAD
@@ -237,7 +237,7 @@ HyperLogLog_reduce(HyperLogLog *self)
         if (self->registers[i] == 0) {
             arr[i] = 'z';
         }
-        
+
         else {
             arr[i] = self->registers[i];
         }

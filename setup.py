@@ -9,9 +9,9 @@ setup(
     maintainer='Joshua Andersen',
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
-        Extension('HLL', ['hll.c', 'murmur3.c']),
+        Extension('HLL', ['src/hll.c', 'lib/murmur3.c']),
     ],
-    headers=['hll.h', 'murmur3.h'],
+    headers=['src/hll.h', 'lib/murmur3.h'],
     keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'probablistic counting'],
     long_description=\
 """
