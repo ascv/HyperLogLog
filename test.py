@@ -59,7 +59,7 @@ class TestCardinalityEstimation(unittest.TestCase):
         c = hll.cardinality()
         correction = 7916284520 <= c and c <= 7916284521
         self.assertTrue(correction)
- 
+
 class TestHyperLogLogConstructor(unittest.TestCase):
 
     def test_one_is_invalid_size(self):
@@ -75,17 +75,17 @@ class TestHyperLogLogConstructor(unittest.TestCase):
             HyperLogLog(2)
         except Exception:
             self.fail()
-    
+
     def test_maximum_size_is_valid(self):
         try:
             HyperLogLog(16)
         except Exception:
             self.fail()
-    
+
     def test_greater_than_the_maximum_size_is_invalid(self):
         with self.assertRaises(ValueError):
-            HyperLogLog(17)           
-                 
+            HyperLogLog(17)
+
     def test_all_registers_initialized_to_zero(self):
         hll = HyperLogLog(5)
         registers = hll.registers()
@@ -111,7 +111,7 @@ class TestMerging(unittest.TestCase):
         hll2 = HyperLogLog(5)
         with self.assertRaises(ValueError):
             hll.merge(hll2)
-             
+
     def test_merge(self):
         expected = bytearray(4)
         expected[0] = 1
