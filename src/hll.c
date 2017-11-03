@@ -1,5 +1,6 @@
 #include <math.h>
 #include <Python.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include "hll.h"
@@ -8,12 +9,12 @@
 
 typedef struct {
     PyObject_HEAD
-    char * registers;          /* ranks */
-    double cache;              /* cached cardinality estimate */
-    unsigned short k;          /* size = 2^k */
-    unsigned short use_cache;  /* use cached result */
-    uint32_t seed;             /* Murmur3 seed */
-    uint32_t size;             /* number of registers */
+    char * registers; /* contains the ranks */
+    uint32_t seed;    /* Murmur3 seed */
+    uint32_t size;    /* number of registers */
+    unsigned short k; /* size = 2^k */
+    double cache;     /* cached cardinality estimate */
+    bool use_cache;   /* use cached result */
 } HyperLogLog;
 
 static void
@@ -373,7 +374,7 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization function for pickling."
-    }, 
+    },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
      "Get a copy of the registers as a bytearray."
     },
