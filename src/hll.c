@@ -209,6 +209,8 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
     char *hllRegisters = PyByteArray_AsString(hllByteArray);
 
+    self->use_cache = 0;
+
     uint32_t i;
     for (i = 0; i < self->size; i++) {
         if (self->registers[i] < hllRegisters[i]) {
@@ -293,6 +295,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
         return NULL;
     }
 
+    self->use_cache = 0;
     self->registers[index] = rank;
 
     Py_INCREF(Py_None);
