@@ -13,8 +13,8 @@ typedef struct {
     uint32_t seed;    /* Murmur3 seed */
     uint32_t size;    /* number of registers */
     unsigned short k; /* size = 2^k */
-    double cache;     /* cached cardinality estimate */
-    bool use_cache;   /* use cached result */
+    double cache;     /* cache of cardinality estimate */
+    bool use_cache;   /* use cached cardinality */
 } HyperLogLog;
 
 static void
@@ -322,6 +322,7 @@ HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 
     char* registers;
     registers = PyByteArray_AsString((PyObject*) regs);
+    self->use_cache = 0;
 
     int i;
     for (i = 0; i < self->size; i++) {

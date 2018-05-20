@@ -2,8 +2,8 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='1.2.3',
-    description='HyperLogLog implementation in C.',
+    version='1.2.6',
+    description='HyperLogLog implementation in C for python.',
     author='Joshua Andersen',
     author_email='anderj0@uw.edu',
     maintainer='Joshua Andersen',
@@ -12,7 +12,7 @@ setup(
         Extension('HLL', ['src/hll.c', 'lib/murmur3.c']),
     ],
     headers=['src/hll.h', 'lib/murmur3.h'],
-    keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'probablistic counting'],
+    keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'counting', 'sketch'],
     long_description=\
 """
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
