@@ -5,7 +5,7 @@ using a Murmur3 hash [2] for python 2.7.x or python 3.x.
 ![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)
 (https://travis-ci.org/ascv/HyperLogLog)
 
-v 1.2.3
+v 1.2.6
 
 Setup
 =====
