@@ -2,16 +2,16 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='1.2.6',
+    version='2.0.0',
     description='HyperLogLog implementation in C for python.',
     author='Joshua Andersen',
     author_email='anderj0@uw.edu',
     maintainer='Joshua Andersen',
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
-        Extension('HLL', ['src/hll.c', 'lib/murmur3.c']),
+        Extension('HLL', ['src/hll.c', 'lib/murmur3.c', 'lib/murmur2.c']),
     ],
-    headers=['src/hll.h', 'lib/murmur3.h'],
+    headers=['src/hll.h', 'lib/murmur3.h', 'lib/murmur2.h'],
     keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'counting', 'sketch'],
     long_description=\
 """
