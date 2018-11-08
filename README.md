@@ -5,7 +5,7 @@ using a Murmur3 hash [2] for python 2.7.x or python 3.x.
 ![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)
 (https://travis-ci.org/ascv/HyperLogLog)
 
-v 1.2.6
+v 1.2.7
 
 Setup
 =====
@@ -88,7 +88,7 @@ Gets the number of registers.
 License
 =======
 
-This software is released under the [MIT License](https://gist.github.com/ascv/5123769).
+This software is released under the [MIT License](LICENSE).
 
 References
 ==========
