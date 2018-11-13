@@ -3,20 +3,21 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "hll.h"
 #include "structmember.h"
 #include "../lib/murmur2.h"
 
 typedef struct {
     PyObject_HEAD
-    char * registers; /* first set bits (e.g. leading zero count + 1) */
-    char * histogram; /* histogram of the first set bits */
-    uint32_t seed;    /* seed for the Murmur2 hash */
+    char * registers; /* contains the ranks */
+    uint32_t * histogram; /* register histogram */
+    uint32_t seed;    /* Murmur3 seed */
     uint32_t size;    /* number of registers */
-    unsigned short k; /* size = 2^k */
+    unsigned short k; /* 2^k = size */
     double cache;     /* cache of cardinality estimate */
-    bool use_cache;   /* use cached cardinality */
-    uint64_t debug;   /* debugging value */
+    bool use_cache;   /* whether to cached cardinality */
+    uint64_t histogram_sum; /* sum of values in histogram */
 } HyperLogLog;
 
 static void
@@ -24,9 +25,9 @@ HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
     #if PY_MAJOR_VERSION >= 3
-        Py_TYPE(self)->tp_free((PyObject*)self);
+        Py_TYPE(self)->tp_free((PyObject*) self);
     #else
-        self->ob_type->tp_free((PyObject*)self);
+        self->ob_type->tp_free((PyObject*) self);
     #endif
 }
 
@@ -56,8 +57,8 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     }
 
     self->size = 1 << self->k;
-    self->registers = (char *)calloc(self->size, sizeof(char));
-    self->histogram = (char *)calloc(33, sizeof(char));
+    self->registers = (char *) calloc(self->size, sizeof(char));
+    self->histogram = (uint32_t *) calloc(64, sizeof(uint32_t));
     self->histogram[0] = self->size;
 
     self->cache = 0;
@@ -87,22 +88,29 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     hash = MurmurHash64A((void *) data, dataLen, self->seed);
 
-    /* Use the first k bits as an index */
+    // Use the first k bits as an index to determine the register to use
     index = (hash >> (64 - self->k));
+    old_fsb = self->registers[index];
 
-    /* Find the position of the first set bit in the remaining 64 - k bits */
-    new_fsb = (hash << self->k) >> self->k;
-    new_fsb = lzc(new_fsb) - self->k + 1;
+    // Get the leading zero count of the remaining 64-k bits
+    new_fsb = hash << self->k;
+    new_fsb = clz(new_fsb) + 1;
 
     if (new_fsb > self->registers[index]) {
-        old_fsb = self->registers[index];
-
         self->registers[index] = new_fsb;
         self->use_cache = 0;
 
-        self->histogram[old_fsb]--;
-        self->histogram[new_fsb]++;
+        self->histogram[new_fsb] += 1;
+
+        if (self->histogram[old_fsb] > 0) {
+            self->histogram[old_fsb] -= 1;
+            self->histogram[0] -= 1;
+        }
+
+        self->histogram[0] += 1;
     }
+
+    //printf("index: %lu\told fsb: %lu\tnew fsb: %lu\thistogram[%lu]: %u\n", index, old_fsb, new_fsb, new_fsb, self->histogram[new_fsb] + 1);
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -117,8 +125,27 @@ HyperLogLog_cardinality(HyperLogLog *self)
         return Py_BuildValue("d", self->cache);
     }
 
-    static const double two_32 = 4294967296.0;
-    static const double neg_two_32 = -4294967296.0;
+
+    double m = (double)self->size;
+    double z = m * tau((m-self->histogram[self->k + 1])/(double)m);
+
+    printf("\nCARDINALITY\n");
+    printf("===========\n");
+    printf("k: %d\n", self->k);
+    printf("m: %f\n", m);
+    printf("histogram sum: %u\n", self->histogram[0]);
+    printf("z0 = tau((%f - %d)/%f)\n", m, self->histogram[self->k+1], m);
+    printf("z0: %f\n", z);
+
+    uint64_t j;
+    for (j = 64 - self->k; j >= 1; --j) {
+        z += self->histogram[j];
+        z *= 0.5;
+    }
+    printf("z1: %f\n", z);
+    z += m * sigma(((double)self->histogram[0])/(double)m);
+    printf("z2: %f\n", z);
+
     double alpha = 0.0;
 
     switch (self->size) {
@@ -135,37 +162,10 @@ HyperLogLog_cardinality(HyperLogLog *self)
         alpha = 0.7213/(1.0 + 1.079/(double) self->size);
         break;
     }
+    printf("alpha: %f\n", alpha);
 
-    uint32_t i;
-    double rank;
-    double sum = 0.0;
-
-    for (i = 0; i < self->size; i++) {
-        rank = (double) self->registers[i];
-        sum = sum + pow(2, -1*rank);
-    }
-
-    double estimate = alpha * (1/sum) * self->size * self->size;
-
-    if (estimate <= 2.5 * self->size) {
-        uint32_t zeros = 0;
-        uint32_t i;
-
-        for (i = 0; i < self->size; i++) {
-            if (self->registers[i] == 0) {
-               zeros += 1;
-            }
-        }
-
-        if (zeros != 0) {
-            double size = (double) self->size;
-            estimate = size * log(size / (double) zeros);
-        }
-    }
-
-    if (estimate > (1.0/30.0) * two_32) {
-        estimate = neg_two_32 * log(1.0 - estimate/two_32);
-    }
+    double estimate = alpha*m*(m/z);
+    printf("estimate: %f\n", estimate);
 
     self->cache = estimate;
     self->use_cache = 1;
@@ -238,7 +238,6 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 static PyObject *
 HyperLogLog_reduce(HyperLogLog *self)
 {
-
     char *arr = (char *) malloc(self->size * sizeof(char));
 
     /* Pickle protocol 2, used in python 2.x, doesn't allow null bytes in
@@ -373,17 +372,7 @@ HyperLogLog_size(HyperLogLog* self)
     return Py_BuildValue("i", self->size);
 }
 
-/* Gets the number of registers. */
-static PyObject *
-HyperLogLog_debug(HyperLogLog* self)
-{
-    return Py_BuildValue("k", self->debug);
-}
-
 static PyMethodDef HyperLogLog_methods[] = {
-    {"debug", (PyCFunction)HyperLogLog_size, METH_NOARGS,
-     "debugging method."
-    },
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element."
     },
@@ -527,107 +516,97 @@ static PyTypeObject HyperLogLogType = {
 
 /* --------------------------- Helper functions ----------------------------- */
 
-/* Get the leading zeroes count using a binary search and lookup table */
-static inline uint8_t lzc(uint64_t x) {
+/* Count leading zeros */
+static inline uint8_t clz(uint64_t x) {
+
+    uint8_t n;
 
     static uint8_t const zeroes[] = {
-        8, 7, 6, 6, 5, 5, 5, 5,
-        4, 4, 4, 4, 4, 4, 4, 4,
-        3, 3, 3, 3, 3, 3, 3, 3,
-        3, 3, 3, 3, 3, 3, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0
+        64, 63, 62, 62, 61, 61, 61, 61,
+        60, 60, 60, 60, 60, 60, 60, 60,
+        59, 59, 59, 59, 59, 59, 59, 59,
+        59, 59, 59, 59, 59, 59, 59, 59,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56
     };
 
-    uint8_t shift;
-    uint8_t byte;
-
-    /* Do a binary search and lookup which byte the first set bit is in */
+    /* Do a binary search to find which byte contains the first set bit */
     if (x >= (1UL << 32UL)) {
         if (x >= (1UL << 48UL)) {
             if (x >= (1UL << 56UL)) {
-                shift = 56;
-                byte = 0;
+                n = 56;
             }
             else {
-                shift = 48;
-                byte = 1;
+                n = 48;
             }
         }
 
         else {
-            if (x >= (1UL << 40UL)) {
-                shift = 40;
-                byte = 2;
+            if (x >= (1UL << 38UL)) {
+                n = 36;
             }
-
             else {
-                shift = 32;
-                byte = 3;
+                n = 32;
             }
         }
     }
+
     else {
         if (x >= (1U << 16U)) {
             if (x >= (1U << 24U)) {
-                shift = 24;
-                byte = 4;
+                n = 24;
             }
-
             else {
-                shift = 16;
-                byte = 5;
+                n = 16;
             }
         }
 
         else {
             if (x >= (1U << 8U)) {
-                shift = 8;
-                byte = 6;
+                n = 8;
             }
-
             else {
-                shift = 0;
-                byte = 7;
+                n = 0;
             }
         }
     }
 
-    /* Lookup the lzc in the byte and compute the total lzc */
-    return zeroes[x >> shift] + 8*byte;
+    //printf("x >> n: %lu >> %u = %lu\n", x, n, x >> n);
+
+    /* Use the byte to lookup the leading zero count */
+    return zeroes[(uint8_t)(x >> n)] - n;
 }
 
-/* Helper function sigma as defined in
- * "New cardinality estimation algorithms for HyperLogLog sketches"
- * Otmar Ertl, arXiv:1702.01284 */
 static inline double sigma(double x) {
-    if (x == 1.) return INFINITY;
+    if (x == 1.) {
+        return INFINITY;
+    }
     double z_prime;
     double y = 1;
     double z = x;
@@ -640,14 +619,12 @@ static inline double sigma(double x) {
     return z;
 }
 
-/* Helper function tau as defined in
- * "New cardinality estimation algorithms for HyperLogLog sketches"
- * Otmar Ertl, arXiv:1702.01284 */
 static inline double tau(double x) {
     if (x == 0. || x == 1.) return 0.;
     double z_prime;
     double y = 1.0;
     double z = 1 - x;
+
     do {
         x = sqrt(x);
         z_prime = z;
