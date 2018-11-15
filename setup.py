@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='1.2.6',
+    version='1.2.7',
     description='HyperLogLog implementation in C for python.',
     author='Joshua Andersen',
     author_email='anderj0@uw.edu',
@@ -13,6 +13,7 @@ setup(
     ],
     headers=['src/hll.h', 'lib/murmur3.h'],
     keywords=['HyperLogLog', 'Hyper LogLog', 'LogLog', 'cardinality', 'counting', 'sketch'],
+    license='MIT',
     long_description=\
 """
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
