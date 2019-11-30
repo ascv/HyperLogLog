@@ -10,13 +10,13 @@
 
 typedef struct {
     PyObject_HEAD
-    char * registers;       /* Contains the first set bit positions */
-    unsigned short p;       /* 2^p = size */
-    uint64_t * histogram;   /* register histogram */
-    uint32_t seed;          /* Murmur2 hash seed */
-    uint64_t size;          /* number of registers */
-    double cache;           /* cached cardinality cardinality estimate */
-    bool isCached;          /* 1 if the cache is up to date, otherwise 0 */
+    char * registers;      /* Contains the first set bit positions */
+    unsigned short p;      /* 2^p = number of registers */
+    uint64_t * histogram;  /* Register histogram */
+    uint32_t seed;         /* MurmurHash64A seed */
+    uint64_t size;         /* Number of registers */
+    double cache;          /* Cached cardinality cardinality estimate */
+    bool isCached;         /* If the cache is up to date */
 } HyperLogLog;
 
 static void
@@ -50,17 +50,19 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     }
 
     if (self->p < 2 || self->p > 63) {
-        char * msg = "p should be between 2 and 31";
+        char * msg = "p is out of range";
         PyErr_SetString(PyExc_ValueError, msg);
         return -1;
     }
 
     self->size = 1UL << self->p;
-    self->registers = (char *)calloc(self->size, sizeof(char));
+    uint64_t allocSize = (self->size*6)/8 + 1;
+    //uint64_t allocSize = self->size;
+    self->registers = (char *)calloc(allocSize, sizeof(char));
 
     if (self->registers == NULL) {
         char *msg = (char *)malloc(128 * sizeof(char));
-        sprintf(msg, "Failed to allocate %lu bytes. Use a smaller value for p.", self->size * sizeof(char));
+        sprintf(msg, "Failed to allocate %lu bytes. Use a smaller value for p.", allocSize);
         PyErr_SetString(PyExc_MemoryError, msg);
         return -1;
     }
@@ -77,7 +79,7 @@ static PyMemberDef HyperLogLog_members[] = {
     {NULL} /* Sentinel */
 };
 
-/* Add an element */
+/* Add an element. */
 static PyObject *
 HyperLogLog_add(HyperLogLog *self, PyObject *args)
 {
@@ -92,23 +94,14 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     hash = MurmurHash64A((void *)data, dataLen, self->seed);
 
-    /* Use the first p bits as an index */
-    index = (hash >> (64 - self->p));
+    index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
+    fsb = getReg(index, self->registers); /* Pick a register using the index */
+    newFsb = hash << self->p; /* Get the first p bits */
+    newFsb = clz(newFsb) + 1; /* Find the position of the first set bit */
 
-    /* Use the index to pick a random register */
-    fsb = self->registers[index];
-
-    /* Get the remaining 64-p bits */
-    newFsb = hash << self->p;
-
-    /* Find the position of first set bit. For example, "0001.." has three
-     * leading zeroes and a first set bit in the fourth position. We add 1
-     * to handle the case where there are no leading zeroes (e.g. "101..") */
-    newFsb = clz(newFsb) + 1;
-
-    //* Update the register */
+    /* Update the register */
     if (newFsb > fsb) {
-        self->registers[index] = newFsb;
+        setReg(index, newFsb, self->registers);
         self->histogram[newFsb] += 1;
         self->isCached = 0;
 
@@ -126,7 +119,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 };
 
 
-/* Gets a cardinality estimate */
+/* Get a cardinality estimate */
 static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
@@ -149,6 +142,17 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
     self->cache = estimate;
     self->isCached = 1;
+
+    /* --------------- print registers ----------------------*/
+    //uint64_t nBytes = (self->size*6 + 6)/8;
+    //uint64_t i;
+    //for (i = 0; i < nBytes; i++) {
+    //    printf("%lu\t", i);
+    //    printByte(self->registers[i]);
+    //    printf("\n");
+    //}
+    /* --------------- print registers ----------------------*/
+
 
     return Py_BuildValue("d", estimate);
 }
@@ -218,6 +222,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 
     return Py_None;
 }
+
 
 /* Support for pickling, called when HyperLogLog is serialized. */
 static PyObject *
@@ -503,7 +508,6 @@ static inline uint8_t clz(uint64_t x) {
     return zeroes[fsbByte] - shift;
 }
 
-
 static inline double sigma(double x) {
     if (x == 1.0) {
         return INFINITY;
@@ -541,4 +545,230 @@ static inline double tau(double x) {
     } while(zPrime != z);
 
     return z/3;
+}
+
+/* ========================== Register encoding ==============================
+ *
+ * The value of a register will never exceed 64 so using a byte to store the
+ * value is wasteful. Instead each register uses 6 bits of memory:
+ *
+ *
+ *          b0        b1        b3        b4
+ *          /         /         /         /
+ *     +-------------------+---------+---------+
+ *     |0000 0011|1111 0011|0110 1110|1111 1011|
+ *     +-------------------+---------+---------+
+ *      |_____||_____| |_____||_____| |_____|
+ *         |      |       |      |       |
+ *       offset   m1      m2     m3     m4
+ *
+ *      b = bytes, m = registers
+ *
+ *
+ * The first six bits in b0 are an unused offset. With the exception of byte
+ * aligned registers (e.g. m4), registers will have bits in consecutive bytes.
+ * For example, the register m2 has bits in b1 and b2. The higher order bits
+ * of m2 are in b1 and the lower order bytes of m2 are in the b2.
+ *
+ * Getting a register
+ * ------------------
+ *
+ * Suppose we want to get register m2 (e.g. m=2). First we determining the
+ * indices of the enclosing bytes:
+ *
+ *     left byte  = (6*m + 6)/8 - 1                                (1)
+ *                = 1
+ *
+ *     right byte = left byte + 1                                  (2)
+ *                = 2
+ *
+ * Next we compute the number of bits of m2 in each byte. The number of right
+ * bits is:
+ *
+ *     rb = right bits                                             (3)
+ *        = (6*m + 6) % 8
+ *        = 2
+ *
+ *     lb = left bits                                              (4)
+ *        = 6 - rb
+ *        = 4
+ *
+ * This result is diagrammed below:
+ *
+ *         b1         b2
+ *          \         /
+ *     +---------+---------+
+ *     |1111 0011|0110 1110|
+ *     +---------+---------+
+ *           ^^^^ ^^
+ *           /      \
+ *       left bits  right bits
+ *
+ *       m2 = "001101"
+ *
+ * Next, move the left bits into the higher order positions:
+ *
+ *     +---------+
+ *     |1111 0011|   <-- b1
+ *     |1100 1100|   <-- b1 << rb
+ *     +---------+
+ *
+ * Move the right bits to the lower order position:
+ *
+ *     +---------+
+ *     |0110 1110|   <-- b2
+ *     |0000 0001|   <-- b2 >> (8 - rb)
+ *     +---------+
+ *
+ * Bitwise OR the two bytes, b1 | b2:
+ *
+ *     +---------+
+ *     |1100 1100|  <-- b1
+ *     |0000 0001|  <-- b2
+ *     |1100 1101|  <-- b1 | b2
+ *     +---------+
+ *
+ * Finally use a mask to remove the bits not part of m2:
+ *
+ *     +---------+
+ *     |1100 1101|  <-- b1 | b2
+ *     |0011 1111|  <-- mask to isolate the register bits
+ *     |0000 1101|  <-- m2 = b1 & mask
+ *     +---------+
+ *
+ * Setting a register
+ * ------------------
+ *
+ * Setting a register is similar to getting a register. We determine the
+ * enclosing bytes using (1) and (2). Then the bits of each byte is
+ * computed using (3) and (4). Continuing the previous example using register
+ * m2, at this point we should have:
+ *
+ *         b1         b2
+ *          \         /
+ *     +---------+---------+
+ *     |1111 0011|0110 1110|
+ *     +---------+---------+
+ *           ^^^^ ^^
+ *           /      \
+ *       left bits  right bits
+ *
+ *       lb = 4, rb = 2
+ *       m2 = "001101"
+ *
+ * Let N be the value we want to set. Suppose we want to set m2 to 7 (N=7). We
+ * start by zeroing out the left bits of m2 in the left bytes b1:
+ *
+ *     +---------+
+ *     |1111 0011|  <- b1
+ *     |0011 1100|  <- b1 >> lb
+ *     |1111 0000|  <- b1 << lb
+ *     +---------+
+ *
+ * Next we zero out the right bits of m2 in the right byte b2:
+ *
+ *     +---------+
+ *     |0110 1110|  <- b2
+ *     |1011 1000|  <- b2 << rb
+ *     |0010 1110|  <- b2 >> rb
+ *     +---------+
+ *
+ * Now that we have made space for m2, we need to set the new bits. We can get
+ * new bits by simplying shifting N:
+ *
+ *      new right bits
+ *            \
+ *            vv
+ *    +---------+
+ *    |0000 0111|  <- N=7
+ *    +---------+
+ *       ^^ ^^
+ *        \ /
+ *    new left bits
+ *
+ *    nlb = new left bits
+ *        = N >> rb
+ *        = 7 >> 2
+ *
+ *    nrb = new right bits
+ *        = N << (8 - rb)
+ *        = 7 << 6
+ *
+ * We can now set the left byte b1 using bitwise OR:
+ *
+ *    +---------+
+ *    |1111 0000|  <- b1
+ *    |0000 0001|  <- nlb
+ *    |1111 0001|  <- b1 | nlb
+ *    +---------+
+ *
+ * Setting the right byte b2 using bitwise OR:
+ *
+ *    +---------+
+ *    |0010 1110|  <- b2
+ *    |1100 0000|  <- nrb
+ *    |1110 1110|  <- b2 | nrb
+ *    +---------+
+ *
+ * Since the bytes have been updated, we're done. The final result is shown
+ * below:
+ *
+ *         b1         b2
+ *          \         /
+ *     +---------+---------+
+ *     |1111 0001|1110 1110|
+ *     +---------+---------+
+ *           ^^^^ ^^
+ *           /      \
+ *       left bits  right bits
+ *
+ *       lb = 4, rb = 2
+ *       m2 = "000111"
+ */
+
+static inline uint64_t getReg(uint64_t m, char * regs)
+{
+    uint8_t reg;
+    uint64_t nBits = 6*m + 6;
+    uint64_t bytePos = nBits/8 - 1;
+
+    uint8_t leftByte = regs[bytePos];
+    uint8_t rightByte = regs[bytePos + 1];
+    uint8_t nrb = (uint8_t) (nBits % 8);
+
+    leftByte <<= nrb; /* Get the bits from the left byte */
+    rightByte >>= (8 - nrb); /* Get the bits from the right byte */
+    reg = leftByte | rightByte; /* OR the result to get the register */
+    reg &= 63; /* Remove the higher order bits */
+
+    return (uint64_t)reg;
+}
+
+
+static inline void setReg(uint64_t m, uint8_t n, char *regs)
+{
+    uint64_t nBits = 6*m + 6;
+    uint64_t bytePos = nBits/8 - 1;
+
+    uint8_t nrb = (uint8_t) (nBits % 8);
+    uint8_t nlb = 6 - nrb;
+    uint8_t leftByte = regs[bytePos];
+    uint8_t rightByte = regs[bytePos + 1];
+
+    leftByte = (leftByte >> nlb) << nlb; /* Zero the left bits */
+    rightByte = (rightByte << nrb) >> nrb; /* Zero the right bits */
+    leftByte |= (n >> nrb); /* Set the new left bits */
+    rightByte |= (n << (8 - nrb)); /* Set the new right bits */
+
+    regs[bytePos] = leftByte;
+    regs[bytePos + 1] = rightByte;
+}
+
+
+void printByte(char a)
+{
+    int i;
+    for (i = 0; i < 8; i++) {
+        printf("%d", !!((a << i) & 0x80));
+    }
 }
