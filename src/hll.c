@@ -98,11 +98,15 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     newFsb = hash << self->p; /* Get the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the position of the first set bit */
 
+    printf("index: %lu\tfsb: %lu\tnew fsb:%lu", index, fsb, newFsb);
+
     /* Update the register */
     if (newFsb > fsb) {
         setReg(index, newFsb, self->registers);
         self->histogram[newFsb] += 1;
         self->isCached = 0;
+
+        printf("\tupdated");
 
         /* Update the register histogram */
         if (self->histogram[fsb] > 0) {
@@ -112,6 +116,15 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
         self->histogram[0] += 1;
     }
+    uint64_t doubleCheckVal;
+    doubleCheckVal = getReg(index, self->registers);
+    printf("\tsanity: %lu",doubleCheckVal);
+
+    if (doubleCheckVal != newFsb && (newFsb > fsb)) {
+        printf("\tERROR");
+    }
+
+    printf("\n");
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -770,10 +783,23 @@ static inline void setReg(uint64_t m, uint64_t n, char *regs)
     uint8_t x;
     x = (uint8_t)n;
 
+    printf("\tnBits: %lu\tbytePos: %lu\tnrb: %u\tnlb: %u\tn: %u = ", nBits, bytePos, nrb, nlb, x);
+    printByte(x);
+    printf("\t");
+    printByte(leftByte);
+    printf("|");
+    printByte(rightByte);
+    printf(" ---> ");
+
     leftByte = (leftByte >> nlb) << nlb; /* Zero the left bits */
     rightByte = (rightByte << nrb) >> nrb; /* Zero the right bits */
     leftByte |= (x >> nrb); /* Set the new left bits */
     rightByte |= (x << (8 - nrb)); /* Set the new right bits */
+
+    printByte(leftByte);
+    printf("|");
+    printByte(rightByte);
+    printf("\t");
 
     regs[bytePos] = leftByte;
     regs[bytePos + 1] = rightByte;

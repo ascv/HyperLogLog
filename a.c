@@ -28,6 +28,10 @@ int main() {
 
     printf("\n");
     //printRegs(regs);
+    uint64_t X = 0;
+    uint64_t nBits = 6*X + 6;
+    uint64_t bytePos = nBits/8 - 1;
+    printf("nBits: %lu bytePos: %lu\n", nBits, bytePos);
 }
 
 /* ---------------------------- Get and set ------------------------------- */
