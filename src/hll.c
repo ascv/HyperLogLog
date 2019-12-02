@@ -57,7 +57,6 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 
     self->size = 1UL << self->p;
     uint64_t allocSize = (self->size*6)/8 + 1;
-    //uint64_t allocSize = self->size;
     self->registers = (char *)calloc(allocSize, sizeof(char));
 
     if (self->registers == NULL) {
@@ -743,9 +742,22 @@ static inline uint64_t getReg(uint64_t m, char * regs)
 
     return (uint64_t)reg;
 }
+/*
+ *
+ *          b0        b1        b2        b3
+ *          /         /         /         /
+ *     +-------------------+---------+---------+
+ *     |0000 0011|1111 0011|0110 1110|1111 1011|
+ *     +-------------------+---------+---------+
+ *      |_____||_____| |_____||_____| |_____|
+ *         |      |       |      |       |
+ *       offset   m1      m2     m3     m4
+ *
+ *      b = bytes, m = registers
+ */
 
 
-static inline void setReg(uint64_t m, uint8_t n, char *regs)
+static inline void setReg(uint64_t m, uint64_t n, char *regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -755,10 +767,13 @@ static inline void setReg(uint64_t m, uint8_t n, char *regs)
     uint8_t leftByte = regs[bytePos];
     uint8_t rightByte = regs[bytePos + 1];
 
+    uint8_t x;
+    x = (uint8_t)n;
+
     leftByte = (leftByte >> nlb) << nlb; /* Zero the left bits */
     rightByte = (rightByte << nrb) >> nrb; /* Zero the right bits */
-    leftByte |= (n >> nrb); /* Set the new left bits */
-    rightByte |= (n << (8 - nrb)); /* Set the new right bits */
+    leftByte |= (x >> nrb); /* Set the new left bits */
+    rightByte |= (x << (8 - nrb)); /* Set the new right bits */
 
     regs[bytePos] = leftByte;
     regs[bytePos + 1] = rightByte;
