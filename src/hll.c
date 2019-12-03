@@ -749,26 +749,13 @@ static inline uint64_t getReg(uint64_t m, char * regs)
     uint8_t rightByte = regs[bytePos + 1];
     uint8_t nrb = (uint8_t) (nBits % 8);
 
-    leftByte <<= nrb; /* Get the bits from the left byte */
-    rightByte >>= (8 - nrb); /* Get the bits from the right byte */
+    leftByte <<= nrb; /* Move left bits into high order spots */
+    rightByte >>= (8 - nrb); /* Move rights bits into the low order spots */
     reg = leftByte | rightByte; /* OR the result to get the register */
-    reg &= 63; /* Remove the higher order bits */
+    reg &= 63; /* Get rid of the 2 extra bits */
 
-    return (uint64_t)reg;
+    return (uint64_t) reg;
 }
-/*
- *
- *          b0        b1        b2        b3
- *          /         /         /         /
- *     +-------------------+---------+---------+
- *     |0000 0011|1111 0011|0110 1110|1111 1011|
- *     +-------------------+---------+---------+
- *      |_____||_____| |_____||_____| |_____|
- *         |      |       |      |       |
- *       offset   m1      m2     m3     m4
- *
- *      b = bytes, m = registers
- */
 
 
 static inline void setReg(uint64_t m, uint64_t n, char *regs)
@@ -783,40 +770,12 @@ static inline void setReg(uint64_t m, uint64_t n, char *regs)
 
     uint8_t x;
     x = (uint8_t)n;
-    //printf("\tnBits: %lu\tbytePos: %lu\tnlb: %u\tnrb: %u\tn: %u = ", nBits, bytePos, nlb, nrb, x);
-    /* -----------------------------*/
-    //printByte(x);
-    //printf("\t");
-    //printByte(leftByte);
-    //printf("|");
-    //printByte(rightByte);
-    //printf(" ---> ");
-
-    /* -----------------------------*/
-    leftByte >>= nlb; /* Zero the left bits */
+    leftByte >>= nlb; /* Zero the high order bits */
     rightByte <<= nrb; /* Zero the right bits */
-    //printByte(leftByte);
-    //printf("|");
-    //printByte(rightByte);
-    //printf(" ---> ");
-
-    /* -----------------------------*/
     leftByte <<= nlb; /* Zero the left bits */
     rightByte >>= nrb; /* Zero the right bits */
-    //printByte(leftByte);
-    //printf("|");
-    //printByte(rightByte);
-    //printf(" ---> ");
-
-
-    /* -----------------------------*/
     leftByte |= (x >> nrb); /* Set the new left bits */
     rightByte |= (x << (8 - nrb)); /* Set the new right bits */
-    //printByte(leftByte);
-    //printf("|");
-    //printByte(rightByte);
-    //printf("\t");
-
     regs[bytePos] = leftByte;
     regs[bytePos + 1] = rightByte;
 }

@@ -12,11 +12,6 @@ N = [100, 1000, 100000, 1000000,]
 
 for k in K:
     for n in N:
-        msg = 'k: {} n: {}'.format(k, n)
-        msgLen = len(msg)
-        print msg
-        print('-'*msgLen)
-
         hll = HLL.HyperLogLog(k)
         start = time.time()
         for i in xrange(n):
@@ -26,8 +21,12 @@ for k in K:
         relative_err = (hll.cardinality()-n)/n
         pct_err = relative_err*100
 
-        print('Relative error:\t{}'.format(round(relative_err, 6)))
-        print('Percent error\t{}%'.format(round(pct_err, 4)))
-        print('cardinality:\t{}'.format(round(hll.cardinality())))
-        print('time: {}s'.format(round(elapsed, 6)))
-        print('')
+        msg = "k: {} n: {} RE: {}\tPctErr: {}\tCard: {}\tt: {}s".format(
+            k,
+            n,
+            round(relative_err, 6),
+            round(pct_err, 4),
+            round(hll.cardinality()),
+            round(elapsed, 6)
+        )
+        print(msg)
