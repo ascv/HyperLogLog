@@ -9,3 +9,4 @@ static inline uint64_t getReg(uint64_t m, char * regs);
 
 void printByte(char a);
 void setMemoryErrorMsg(uint64_t bytes);
+uint8_t isValidIndex(uint64_t index, uint64_t size);
