@@ -147,7 +147,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
 
 /* Gets the seed value used in the Murmur hash. */
 static PyObject *
-HyperLogLog_get_register(HyperLogLog* self, PyObject * args)
+HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
 {
     unsigned long index;
 
@@ -159,7 +159,7 @@ HyperLogLog_get_register(HyperLogLog* self, PyObject * args)
         return NULL;
     }
 
-    return Py_BuildValue("i", getReg((uint64_t)index, self->registers));
+    return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
 }
 
 
@@ -198,29 +198,29 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
         long hllSize = PyInt_AS_LONG(size);
     #endif
 
-    if (hllSize != self->size) {
-        //TODO: print differing number of registers
-        PyErr_SetString(PyExc_ValueError, "The number of registers is not equal");
+    if (hllSize > self->size) {
+        PyErr_SetString(PyExc_ValueError, "");
         return NULL;
     }
 
     Py_DECREF(size);
-
-    PyObject *hllByteArray = PyObject_CallMethod(hll, "registers", NULL);
-    char *hllRegisters = PyByteArray_AsString(hllByteArray);
-
     self->isCached = 0;
 
-    uint32_t i;
-    for (i = 0; i < self->size; i++) {
-        if (self->registers[i] < hllRegisters[i]) {
-            self->registers[i] = hllRegisters[i];
+    for (uint64_t i = 0; i < self->size; i++) {
+        PyObject *newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
+        unsigned long newVal = PyLong_AsUnsignedLong(newReg);
+        uint64_t oldVal = getReg(i, self->registers);
+
+        if (oldVal < newVal) {
+            setReg(i, newVal, self->registers);
+            self->histogram[newVal] += 1;
+            self->histogram[oldVal] -= 1;
         }
+
+        Py_DECREF(newReg);
     }
 
-    Py_DECREF(hllByteArray);
     Py_INCREF(Py_None);
-
     return Py_None;
 }
 
@@ -320,7 +320,7 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization helper function for pickling."
     },
-    {"get_register", (PyCFunction)HyperLogLog_get_register, METH_VARARGS,
+    {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
      "Get the value of a register."
     },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
@@ -766,8 +766,7 @@ static inline void setReg(uint64_t m, uint8_t n, char *regs)
 
 void printByte(char a)
 {
-    int i;
-    for (i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
         printf("%d", !!((a << i) & 0x80));
     }
 }
@@ -783,7 +782,7 @@ uint8_t isValidIndex(uint64_t index, uint64_t size)
 {
     uint8_t valid = 1;
 
-    if (index > size - 1) {  // TODO double check if -1 is needed
+    if (index > size - 1) {
         char * msg = "Index exceeds the number of registers.";
         PyErr_SetString(PyExc_IndexError, msg);
         valid = 0;
