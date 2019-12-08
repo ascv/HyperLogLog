@@ -243,9 +243,29 @@ static PyObject *
 HyperLogLog_registers(HyperLogLog *self)
 {
     PyObject *registers;
-    registers = PyByteArray_FromStringAndSize(self->registers, self->size);
+    uint64_t bytes = (self->size*6)/8 + 1;
+    registers = PyByteArray_FromStringAndSize(self->registers, bytes);
     return registers;
 }
+
+
+/* Gets the seed value used in the Murmur hash. */
+static PyObject *
+HyperLogLog_get_register(HyperLogLog* self, PyObject * args)
+{
+    unsigned long index;
+
+    if (!PyArg_ParseTuple(args, "k", &index)) {
+        return NULL;
+    }
+
+    if (!isValidIndex(index, self->size)) {
+        return NULL;
+    }
+
+    return Py_BuildValue("i", getReg((uint64_t)index, self->registers));
+}
+
 
 /* Sets register at index to rank. */
 static PyObject *
@@ -258,15 +278,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
         return NULL;
     }
 
-    if (index < 0) {
-        char * msg = "Negative index.";
-        PyErr_SetString(PyExc_ValueError, msg);
-        return NULL;
-    }
-
-    if (index > self->size - 1) {
-        char * msg = "Index exceeds the number of registers.";
-        PyErr_SetString(PyExc_IndexError, msg);
+    if (!isValidIndex(index, self->size)) {
         return NULL;
     }
 
@@ -399,10 +411,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization helper function for pickling."
     },
-
-    {"get_register", (PyCFunction)HyperLogLog_reg_register, METHVARGS,
+    {"get_register", (PyCFunction)HyperLogLog_get_register, METH_VARARGS,
      "Get the value of a register."
-    }
+    },
     {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
      "Get a copy of the registers as a bytearray."
     },
@@ -863,4 +874,17 @@ void setMemoryErrorMsg(uint64_t bytes)
     char *msg = (char *) malloc(128 * sizeof(char));
     sprintf(msg, "Failed to allocate %lu bytes. Use a smaller value for p.", bytes);
     PyErr_SetString(PyExc_MemoryError, msg);
+}
+
+uint8_t isValidIndex(uint64_t index, uint64_t size)
+{
+    uint8_t valid = 1;
+
+    if (index > size - 1) {  // TODO double check if -1 is needed
+        char * msg = "Index exceeds the number of registers.";
+        PyErr_SetString(PyExc_IndexError, msg);
+        valid = 0;
+    }
+
+    return valid;
 }
