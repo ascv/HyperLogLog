@@ -143,11 +143,28 @@ HyperLogLog_cardinality(HyperLogLog *self)
     return Py_BuildValue("d", estimate);
 }
 
+/* Gets the seed value used in the Murmur hash. */
+static PyObject *
+HyperLogLog_get_register(HyperLogLog* self, PyObject * args)
+{
+    unsigned long index;
+
+    if (!PyArg_ParseTuple(args, "k", &index)) {
+        return NULL;
+    }
+
+    if (!isValidIndex(index, self->size)) {
+        return NULL;
+    }
+
+    return Py_BuildValue("i", getReg((uint64_t)index, self->registers));
+}
+
 
 /* Get a Murmur2 hash of a python string, buffer or bytes (python 3.x) as an
  * unsigned integer. */
 static PyObject *
-HyperLogLog_murmur2_hash(HyperLogLog *self, PyObject *args)
+HyperLogLog_hash(HyperLogLog *self, PyObject *args)
 {
     const char *data;
     const uint64_t dataLen;
@@ -247,22 +264,6 @@ HyperLogLog_registers(HyperLogLog *self)
 }
 
 
-/* Gets the seed value used in the Murmur hash. */
-static PyObject *
-HyperLogLog_get_register(HyperLogLog* self, PyObject * args)
-{
-    unsigned long index;
-
-    if (!PyArg_ParseTuple(args, "k", &index)) {
-        return NULL;
-    }
-
-    if (!isValidIndex(index, self->size)) {
-        return NULL;
-    }
-
-    return Py_BuildValue("i", getReg((uint64_t)index, self->registers));
-}
 
 
 /* Sets register at index to rank. */
@@ -370,8 +371,8 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
      "Merge another HyperLogLog."
     },
-    {"murmur2_hash", (PyCFunction)HyperLogLog_murmur2_hash, METH_VARARGS,
-     "Get a MurmurHash64A"
+    {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
+     "Get a MurmurHash64A hash."
     },
     {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization helper function for pickling."
