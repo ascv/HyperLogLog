@@ -266,43 +266,6 @@ HyperLogLog_registers(HyperLogLog *self)
 }
 
 
-
-
-/* Sets register at index to rank. */
-static PyObject *
-HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
-{
-    unsigned long index;
-    unsigned char val;
-
-    if (!PyArg_ParseTuple(args, "kB", &index, &val)) {
-        return NULL;
-    }
-
-    if (!isValidIndex(index, self->size)) {
-        return NULL;
-    }
-
-    if (!(val < 64)) {
-        char * msg = "Value must be less than 64.";
-        PyErr_SetString(PyExc_ValueError, msg);
-        return NULL;
-    }
-
-    if (val < 0) {
-        char * msg = "value cannot be negative.";
-        PyErr_SetString(PyExc_ValueError, msg);
-        return NULL;
-    }
-
-    self->cache = 0;
-    setReg((uint64_t)index, (uint8_t)val, self->registers);
-
-    Py_INCREF(Py_None);
-    return Py_None;
-
-}
-
 /* Gets the seed value used in the Murmur hash. */
 static PyObject *
 HyperLogLog_seed(HyperLogLog* self)
@@ -310,61 +273,6 @@ HyperLogLog_seed(HyperLogLog* self)
     return Py_BuildValue("i", self->seed);
 }
 
-/* Sets all the registers. */
-static PyObject *
-HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
-{
-    PyObject *obj;
-    char* registers;
-    uint32_t len;
-    int i;
-
-    if (!PyArg_ParseTuple(args, "O", &obj)) {
-        return NULL;
-    }
-
-    if (PyByteArray_Check(obj)) {
-        len = PyByteArray_Size(obj);
-        registers = PyByteArray_AsString(obj);
-    }
-
-    else if (PyBytes_Check(obj)) {
-        len = PyBytes_Size(obj);
-        registers = PyBytes_AsString(obj);
-    }
-
-    else {
-        char* msg = "Registers must be a bytearray or bytes type.";
-        PyErr_SetString(PyExc_TypeError, msg);
-        return NULL;
-    }
-
-    if (len != self->size) {
-        char msg[74];
-        sprintf(msg, "Invalid size. Expected %u registers received %u registers.", self->size, len);
-        PyErr_SetString(PyExc_ValueError, msg);
-        return NULL;
-    }
-
-    self->use_cache = 0;
-
-    // Check for bad register values
-    for (i = 0; i < self->size; i++) {
-        if (registers[i] > 32) {
-            char* msg = "Value greater than than the maximum possible rank (32).";
-            PyErr_SetString(PyExc_ValueError, msg);
-            return NULL;
-        }
-    }
-
-    // Only set registers if all values are okay
-    for (i = 0; i < self->size; i++) {
-        self->registers[i] = registers[i];
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
 
 /* Support for pickling, called when HyperLogLog is de-serialized. */
 static PyObject *
@@ -420,12 +328,6 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
      "Get the hash function seed."
-    },
-    {"set_registers", (PyCFunction)HyperLogLog_set_registers, METH_VARARGS,
-     "Set the registers with a bytearray."
-    },
-    {"set_register", (PyCFunction)HyperLogLog_set_register, METH_VARARGS,
-     "Set a register."
     },
     {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS,
     "De-serialization helper function for pickling."
