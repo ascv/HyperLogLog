@@ -13,7 +13,7 @@ typedef struct {
     char * registers;      /* Contains the first set bit positions */
     unsigned short p;      /* 2^p = number of registers */
     uint64_t * histogram;  /* Register histogram */
-    uint32_t seed;         /* MurmurHash64A seed */
+    uint64_t seed;         /* MurmurHash64A seed */
     uint64_t size;         /* Number of registers */
     double cache;          /* Cached cardinality cardinality estimate */
     bool isCached;         /* If the cache is up to date */
@@ -35,17 +35,16 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     HyperLogLog *self;
     self = (HyperLogLog *)type->tp_alloc(type, 0);
-    self->seed = 314; //TODO: move this to init
     return (PyObject *)self;
 }
 
 static int
 HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"seed", NULL};
+    self->seed = 314;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist,
-                                     &self->p, &self->seed)) {
+    static char *kwlist[] = {"p", "seed"};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, &self->p, &self->seed)) {
         return -1;
     }
 
@@ -96,13 +95,11 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit */
 
-    /* Update the register */
     if (newFsb > fsb) {
         setReg(index, (uint8_t)newFsb, self->registers);
         self->histogram[newFsb] += 1;
         self->isCached = 0;
 
-        /* Update the register histogram */
         if (self->histogram[fsb] > 0) {
             self->histogram[fsb] -= 1;
         }
@@ -148,13 +145,8 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
 {
     unsigned long index;
 
-    if (!PyArg_ParseTuple(args, "k", &index)) {
-        return NULL;
-    }
-
-    if (!isValidIndex(index, self->size)) {
-        return NULL;
-    }
+    if (!PyArg_ParseTuple(args, "k", &index)) return NULL;
+    if (!isValidIndex(index, self->size)) return NULL;
 
     return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
 }
@@ -272,7 +264,7 @@ HyperLogLog_reduce(HyperLogLog *self)
 static PyObject *
 HyperLogLog_seed(HyperLogLog* self)
 {
-    return Py_BuildValue("i", self->seed);
+    return Py_BuildValue("k", self->seed);
 }
 
 
@@ -756,9 +748,9 @@ static inline void setReg(uint64_t m, uint8_t n, char *regs)
     uint8_t leftByte = regs[bytePos];
     uint8_t rightByte = regs[bytePos + 1];
 
-    leftByte >>= nlb; /* Zero the left bits */
+    leftByte >>= nlb;
     leftByte <<= nlb;
-    rightByte <<= nrb; /* Zero the right bits */
+    rightByte <<= nrb;
     rightByte >>= nrb;
     leftByte |= (n >> nrb); /* Set the new left bits */
     rightByte |= (n << (8 - nrb)); /* Set the new right bits */
