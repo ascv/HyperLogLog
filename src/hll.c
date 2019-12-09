@@ -64,7 +64,7 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    self->histogram = (uint64_t *)calloc(64, sizeof(uint64_t));
+    self->histogram = (uint64_t *)calloc(65, sizeof(uint64_t));
     self->histogram[0] = self->size;
     self->cache = 0.0;
     self->isCached = 0;
@@ -105,10 +105,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
         /* Update the register histogram */
         if (self->histogram[fsb] > 0) {
             self->histogram[fsb] -= 1;
-            self->histogram[0] -= 1;
         }
-
-        self->histogram[0] += 1;
     }
 
     Py_INCREF(Py_None);
@@ -175,6 +172,22 @@ HyperLogLog_hash(HyperLogLog *self, PyObject *args)
 
     uint64_t hash = MurmurHash64A((void *) data, dataLen, self->seed);
     return Py_BuildValue("K", hash);
+}
+
+
+/* Gets a histogram of first set bit positions as a list of ints. */
+static PyObject *
+HyperLogLog__histogram(HyperLogLog *self)
+{
+    PyObject* histogram = PyList_New(64);
+
+    /* Skip first value since it contains the size + count */
+    for (int i = 1; i < 65; i++)
+    {
+        PyObject* count = Py_BuildValue("i", self->histogram[i]);
+        PyList_SetItem(histogram, (i-1), count);
+    }
+    return histogram;
 }
 
 
@@ -300,6 +313,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
      "Get a MurmurHash64A hash."
+    },
+    {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
+     "Get a histogram of the register values."
     },
     {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
      "Serialization helper function for pickling."
