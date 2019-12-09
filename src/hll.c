@@ -253,17 +253,6 @@ HyperLogLog_reduce(HyperLogLog *self)
 }
 
 
-/* Gets a copy of the registers as a bytesarray. */
-static PyObject *
-HyperLogLog_registers(HyperLogLog *self)
-{
-    PyObject *registers;
-    uint64_t bytes = (self->size*6)/8 + 1;
-    registers = PyByteArray_FromStringAndSize(self->registers, bytes);
-    return registers;
-}
-
-
 /* Gets the seed value used in the Murmur hash. */
 static PyObject *
 HyperLogLog_seed(HyperLogLog* self)
@@ -320,9 +309,6 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
      "Get the value of a register."
-    },
-    {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
-     "Get a copy of the registers as a bytearray."
     },
     {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
      "Get the hash function seed."
