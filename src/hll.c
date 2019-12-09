@@ -23,11 +23,7 @@ static void
 HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->registers);
-    #if PY_MAJOR_VERSION >= 3
-        Py_TYPE(self)->tp_free((PyObject*) self);
-    #else
-        self->ob_type->tp_free((PyObject*) self);
-    #endif
+    Py_TYPE(self)->tp_free((PyObject*) self);
 }
 
 static PyObject *
@@ -333,12 +329,7 @@ static PyMethodDef HyperLogLog_methods[] = {
 };
 
 static PyTypeObject HyperLogLogType = {
-    #if PY_MAJOR_VERSION >= 3
-        PyVarObject_HEAD_INIT(NULL, 0)
-    #else
-        PyObject_HEAD_INIT(NULL)
-    0,                               /* ob_size */
-    #endif
+    PyVarObject_HEAD_INIT(NULL, 0)
     "HLL.HyperLogLog",               /* tp_name */
     sizeof(HyperLogLog),             /* tp_basicsize */
     0,                               /* tp_itemsize */
