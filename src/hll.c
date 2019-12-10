@@ -17,7 +17,7 @@ typedef struct {
     uint64_t * histogram;  /* Register histogram */
     uint64_t seed;         /* MurmurHash64A seed */
     uint64_t size;         /* Number of registers */
-    double cache;          /* Cached cardinality cardinality estimate */
+    uint64_t cache;          /* Cached cardinality cardinality estimate */
     bool isCached;         /* If the cache is up to date */
 } HyperLogLog;
 
@@ -63,7 +63,7 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 
     self->histogram = (uint64_t *)calloc(65, sizeof(uint64_t));
     self->histogram[0] = self->size;
-    self->cache = 0.0;
+    self->cache = 0;
     self->isCached = 0;
 
     return 0;
@@ -115,7 +115,7 @@ static PyObject *
 HyperLogLog_cardinality(HyperLogLog *self)
 {
     if (self->isCached) {
-        return Py_BuildValue("d", self->cache);
+        return Py_BuildValue("K", self->cache);
     }
 
     double alpha = 0.7213475;
@@ -129,12 +129,12 @@ HyperLogLog_cardinality(HyperLogLog *self)
     }
 
     z += m*sigma((double)self->histogram[0]/m);
-    double estimate = alpha*m*(m/z);
+    uint64_t estimate = (uint64_t) round(alpha*m*(m/z));
 
     self->cache = estimate;
     self->isCached = 1;
 
-    return Py_BuildValue("d", estimate);
+    return Py_BuildValue("K", estimate);
 }
 
 /* Gets the seed value used in the Murmur hash. */
