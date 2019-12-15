@@ -2,14 +2,15 @@ import random
 import time
 import HLL
 
+K = [14, 16, 18,]
+N = [5, 50, 500, 5000, 50000, 500000,]
+
 def print_registers(h):
     regs = '|'
     for i in range(h.size()):
         regs += '{}|'.format(h._get_register(i))
     print(regs)
 
-K = [24,]
-N = [5, 50, 500, 5000, 50000, 500000,]
 
 msg = "{: <3}{: <16}{: <24}{: <12}{: <12}{: >8}"
 print(msg.format('k', 'n', 'card', 'RE', '% err', 'Time'))
@@ -35,7 +36,6 @@ for k in K:
             round(pct_err, 4),
             round(elapsed, 4)
         )
-
         print(out)
 
 h1 = HLL.HyperLogLog(3)
@@ -57,3 +57,17 @@ print_registers(h1)
 print(h1.cardinality())
 
 print(h1._histogram())
+
+print('')
+print(dir(h1))
+
+import pickle
+print(pickle.dumps(h1))
+h3=pickle.loads(pickle.dumps(h1))
+print(h1._histogram())
+print(h3._histogram())
+print_registers(h1)
+print_registers(h3)
+##print('H3:')
+##print(h3.cardinality())
+#print_registers(h3)
