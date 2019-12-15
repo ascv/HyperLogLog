@@ -10,13 +10,14 @@
 
 typedef struct {
     PyObject_HEAD
-    char * registers;      /* Contains the first set bit positions */
-    unsigned short p;      /* 2^p = number of registers */
-    uint64_t * histogram;  /* Register histogram */
-    uint64_t seed;         /* MurmurHash64A seed */
-    uint64_t size;         /* Number of registers */
-    uint64_t cache;          /* Cached cardinality cardinality estimate */
-    bool isCached;         /* If the cache is up to date */
+    char * registers; /* Contains the first set bit positions */
+    unsigned short p; /* 2^p = number of registers */
+    uint64_t * histogram; /* Register histogram */
+    uint64_t seed; /* MurmurHash64A seed */
+    uint64_t size; /* Number of registers */
+    uint64_t cache; /* Cached cardinality estimate */
+    uint64_t count; /* Number of elements added */
+    bool isCached; /* If the cache is up to date */
 } HyperLogLog;
 
 static void
@@ -37,10 +38,11 @@ HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
 {
+    static char *kwlist[] = {"p", "seed"};
     self->seed = 314;
 
-    static char *kwlist[] = {"p", "seed"};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwlist, &self->p, &self->seed)) {
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwds, "i|i", kwlist, &self->p, &self->seed)) {
         return -1;
     }
 
@@ -77,13 +79,9 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 {
     const char *data;
     const uint64_t dataLen;
-
-    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) {
-        return NULL;
-    }
-
     uint64_t hash, index, fsb, newFsb;
 
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
     hash = MurmurHash64A((void *)data, dataLen, self->seed);
 
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
@@ -106,7 +104,6 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     Py_RETURN_FALSE;
 };
-
 
 /* Get a cardinality estimate */
 static PyObject *
@@ -135,7 +132,7 @@ HyperLogLog_cardinality(HyperLogLog *self)
     return Py_BuildValue("K", estimate);
 }
 
-/* Gets the seed value used in the Murmur hash. */
+/* Gets the the Murmur hash seed. */
 static PyObject *
 HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
 {
@@ -147,23 +144,18 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
     return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
 }
 
-
-/* Get a Murmur2 hash of a python string, buffer or bytes (python 3.x) as an
- * unsigned integer. */
+/* Get a Murmur64A hash of a string, buffer or bytes object. */
 static PyObject *
 HyperLogLog_hash(HyperLogLog *self, PyObject *args)
 {
     const char *data;
     const uint64_t dataLen;
 
-    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) {
-        return NULL;
-    }
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
 
     uint64_t hash = MurmurHash64A((void *) data, dataLen, self->seed);
     return Py_BuildValue("K", hash);
 }
-
 
 /* Gets a histogram of first set bit positions as a list of ints. */
 static PyObject *
@@ -171,7 +163,7 @@ HyperLogLog__histogram(HyperLogLog *self)
 {
     PyObject* histogram = PyList_New(64);
 
-    /* Skip first value since it contains the size + count */
+    /* We skip first value since it contains the size + count */
     for (int i = 1; i < 65; i++)
     {
         PyObject* count = Py_BuildValue("i", self->histogram[i]);
@@ -180,16 +172,14 @@ HyperLogLog__histogram(HyperLogLog *self)
     return histogram;
 }
 
-
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
  * the other HyperLogLog are unaffected. */
 static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 {
     PyObject *hll;
-    if (!PyArg_ParseTuple(args, "O", &hll)) {
-        return NULL;
-    }
+
+    if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
 
     PyObject *size = PyObject_CallMethod(hll, "size", NULL);
 
@@ -200,7 +190,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     #endif
 
     if (hllSize > self->size) {
-        PyErr_SetString(PyExc_ValueError, "");
+        PyErr_SetString(PyExc_ValueError, "Unequal sizes");
         return NULL;
     }
 
@@ -225,36 +215,26 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     return Py_None;
 }
 
-
-/* Support for pickling, called when HyperLogLog is serialized. */
 static PyObject *
 HyperLogLog_reduce(HyperLogLog *self)
 {
-    char *arr = (char *) malloc(self->size * sizeof(char));
+    PyObject* val;
+    PyObject* state = PyList_New(self->size + 64);
 
-    /* Pickle protocol 2, used in python 2.x, doesn't allow null bytes in
-     * strings and does not support pickling bytearrays. For backwards
-     * compatibility, we set all null bytes to 'z' before pickling.
-     */
-    int i;
-    for (i = 0; i < self->size; i++) {
-        if (self->registers[i] == 0) {
-            arr[i] = 'z';
-        }
+    for (int i = 0; i < 64; i++) {
+        val = Py_BuildValue("k", self->histogram[i]);
+        PyList_SetItem(state, i, val);
+    }
 
-        else {
-            arr[i] = self->registers[i];
-        }
+    for (int i = 64; i < self->size + 64; i++)
+    {
+        val = Py_BuildValue("k", getReg(i - 64, self->registers));
+        PyList_SetItem(state, i, val);
     }
 
     PyObject *args = Py_BuildValue("(ii)", self->p, self->seed);
-    PyObject *registers = Py_BuildValue("s#", arr, self->size);
-
-    free(arr);
-
-    return Py_BuildValue("(ONN)", Py_TYPE(self), args, registers);
+    return Py_BuildValue("(ONN)", Py_TYPE(self), args, state);
 }
-
 
 /* Gets the seed value used in the Murmur hash. */
 static PyObject *
@@ -263,24 +243,27 @@ HyperLogLog_seed(HyperLogLog* self)
     return Py_BuildValue("k", self->seed);
 }
 
-
-/* Support for pickling, called when HyperLogLog is de-serialized. */
 static PyObject *
 HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 {
 
-    char *registers;
-    if (!PyArg_ParseTuple(state, "s:setstate", &registers)) {
-        return NULL;
+    PyObject* dump;
+    PyObject* valPtr;
+    unsigned long val;
+
+    if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
+
+    for (int i = 0; i < 64; i++) {
+        valPtr = PyList_GetItem(dump, i);
+        val = PyLong_AsUnsignedLong(valPtr);
+        self->histogram[i] = val;
     }
 
-    int i;
-    for (i = 0; i < self->size; i++) {
-        if (registers[i] == 'z') {
-            self->registers[i] = 0;
-        } else {
-            self->registers[i] = registers[i];
-        }
+    for (int i = 64; i < self->size + 64; i++)
+    {
+        valPtr = PyList_GetItem(dump, i);
+        val = PyLong_AsUnsignedLong(valPtr);
+        setReg(i-64, (uint8_t)val, self->registers);
     }
 
     Py_INCREF(Py_None);
@@ -398,26 +381,14 @@ static PyTypeObject HyperLogLogType = {
 {
     PyObject* m;
     #if PY_MAJOR_VERSION >= 3
-        if (PyType_Ready(&HyperLogLogType) < 0) {
-            return NULL;
-        }
-
+        if (PyType_Ready(&HyperLogLogType) < 0) return NULL;
         m = PyModule_Create(&HyperLogLogmodule);
-
-        if (m == NULL) {
-            return NULL;
-        }
+        if (m == NULL) return NULL;
     #else
-        if (PyType_Ready(&HyperLogLogType) < 0) {
-            return;
-        }
-
-        char *description = "HyperLogLog cardinality estimator.";
-        m = Py_InitModule3("HLL", module_methods, description);
-
-        if (m == NULL) {
-            return;
-        }
+        if (PyType_Ready(&HyperLogLogType) < 0) return;
+        char *info = "HyperLogLog cardinality estimator.";
+        m = Py_InitModule3("HLL", module_methods, info);
+        if (m == NULL) return;
     #endif
 
     Py_INCREF(&HyperLogLogType);
@@ -428,113 +399,6 @@ static PyTypeObject HyperLogLogType = {
     #endif
 }
 
-
-/* Counts leading zeros (number of consecutive of zero bits from the left) in an
- * unsigned 64bit integer. */
-static inline uint8_t clz(uint64_t x) {
-
-    static uint8_t const zeroes[] = {
-        64, 63, 62, 62, 61, 61, 61, 61,
-        60, 60, 60, 60, 60, 60, 60, 60,
-        59, 59, 59, 59, 59, 59, 59, 59,
-        59, 59, 59, 59, 59, 59, 59, 59,
-        58, 58, 58, 58, 58, 58, 58, 58,
-        58, 58, 58, 58, 58, 58, 58, 58,
-        58, 58, 58, 58, 58, 58, 58, 58,
-        58, 58, 58, 58, 58, 58, 58, 58,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        57, 57, 57, 57, 57, 57, 57, 57,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56
-    };
-
-    uint8_t shift;
-
-    /* Do a binary search to find which byte contains the first set bit. */
-    if (x >= (1UL << 32UL)) {
-        if (x >= (1UL << 48UL)) {
-            if (x >= (1UL << 56UL)) shift = 56;
-            else shift = 48;
-        } else {
-            if (x >= (1UL << 38UL)) shift = 40;
-            else shift = 32;
-        }
-    } else {
-        if (x >= (1U << 16U)) {
-            if (x >= (1U << 24U)) shift = 24;
-            else shift = 16;
-        } else {
-            if (x >= (1U << 8U)) shift = 8;
-            else shift = 0;
-        }
-    }
-
-    /* Get the byte containing the first set bit. */
-    uint8_t fsbByte = (uint8_t)(x >> shift);
-
-    /* Look up the leading zero count for (x >> shift) using byte. Subtract
-     * the bit shift to get the leading zero count for x. */
-    return zeroes[fsbByte] - shift;
-}
-
-static inline double sigma(double x) {
-    if (x == 1.0) {
-        return INFINITY;
-    }
-
-    double zPrime;
-    double y = 1.0;
-    double z = x;
-
-    do {
-        x *= x;
-        zPrime = z;
-        z += x*y;
-        y += y;
-    } while(z != zPrime);
-
-    return z;
-}
-
-
-static inline double tau(double x) {
-    if (x == 0.0 || x == 1.0) {
-        return 0.0;
-    }
-
-    double zPrime;
-    double y = 1.0;
-    double z = 1 - x;
-
-    do {
-        x = sqrt(x);
-        zPrime = z;
-        y *= 0.5;
-        z -= pow(1 - x, 2)*y;
-    } while(zPrime != z);
-
-    return z/3;
-}
 
 /* ========================== Register encoding ==============================
  *
@@ -749,20 +613,132 @@ static inline void setReg(uint64_t m, uint8_t n, char *regs)
     regs[bytePos + 1] = rightByte;
 }
 
-void printByte(char a)
+
+/* ========================== Helper functions ============================= */
+
+/* Counts leading zeros (number of consecutive of zero bits from the left) in
+ * an unsigned 64bit integer. */
+static inline uint8_t clz(uint64_t x) {
+
+    uint8_t shift;
+
+    static uint8_t const zeroes[] = {
+        64, 63, 62, 62, 61, 61, 61, 61,
+        60, 60, 60, 60, 60, 60, 60, 60,
+        59, 59, 59, 59, 59, 59, 59, 59,
+        59, 59, 59, 59, 59, 59, 59, 59,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        58, 58, 58, 58, 58, 58, 58, 58,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        57, 57, 57, 57, 57, 57, 57, 57,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56,
+        56, 56, 56, 56, 56, 56, 56, 56
+    };
+
+    /* Do a binary search to find which byte contains the first set bit. */
+    if (x >= (1UL << 32UL)) {
+        if (x >= (1UL << 48UL)) {
+            if (x >= (1UL << 56UL)) shift = 56;
+            else shift = 48;
+        } else {
+            if (x >= (1UL << 38UL)) shift = 40;
+            else shift = 32;
+        }
+    } else {
+        if (x >= (1U << 16U)) {
+            if (x >= (1U << 24U)) shift = 24;
+            else shift = 16;
+        } else {
+            if (x >= (1U << 8U)) shift = 8;
+            else shift = 0;
+        }
+    }
+
+    /* Get the byte containing the first set bit. */
+    uint8_t fsbByte = (uint8_t)(x >> shift);
+
+    /* Look up the leading zero count for (x >> shift) using byte. Subtract
+     * the bit shift to get the leading zero count for x. */
+    return zeroes[fsbByte] - shift;
+}
+
+static inline double sigma(double x) {
+    if (x == 1.0) {
+        return INFINITY;
+    }
+
+    double zPrime;
+    double y = 1.0;
+    double z = x;
+
+    do {
+        x *= x;
+        zPrime = z;
+        z += x*y;
+        y += y;
+    } while(z != zPrime);
+
+    return z;
+}
+
+static inline double tau(double x) {
+    if (x == 0.0 || x == 1.0) {
+        return 0.0;
+    }
+
+    double zPrime;
+    double y = 1.0;
+    double z = 1 - x;
+
+    do {
+        x = sqrt(x);
+        zPrime = z;
+        y *= 0.5;
+        z -= pow(1 - x, 2)*y;
+    } while(zPrime != z);
+
+    return z/3;
+}
+
+/* Print a the bits in a byte. */
+void printByte(char b)
 {
     for (int i = 0; i < 8; i++) {
-        printf("%d", !!((a << i) & 0x80));
+        printf("%d", !!((b << i) & 0x80));
     }
 }
 
+/* Set an error message. */
 void setMemoryErrorMsg(uint64_t bytes)
 {
     char *msg = (char *) malloc(128 * sizeof(char));
-    sprintf(msg, "Failed to allocate %lu bytes. Use a smaller value for p.", bytes);
+    sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
     PyErr_SetString(PyExc_MemoryError, msg);
 }
 
+/* Check if a register index is valid, if not then set an error message. */
 uint8_t isValidIndex(uint64_t index, uint64_t size)
 {
     uint8_t valid = 1;
