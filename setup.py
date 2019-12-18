@@ -17,11 +17,16 @@ setup(
     long_description=\
 """
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
-cardinality of extraordinarily large data sets. This module is written in C
-and uses the Murmurhash64A hash function. It uses an improved version of the
-algorithm [2] that significantly larger cardinalities with better accuracy.
+cardinality of extraordinarily large data sets. This implementation [2] is
+written in C. Specifically
 
+* Improved version of the algorithm eliminates the need to do any bias
+  correction
+* Uses the 64 bit MurmurHash64A hash function
+* 6 bit register encoding
+* No bias correction (e.g. HLL+, SlidingHyperLogLog [3]) since it isn't
 
 [1] http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf
+[2] New Paper
 """
 )
