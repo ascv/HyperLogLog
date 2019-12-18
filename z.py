@@ -60,9 +60,10 @@ print(h1._histogram())
 
 print('')
 print(dir(h1))
+print(h1)
 
 import pickle
-print(pickle.dumps(h1))
+#print(pickle.dumps(h1))
 h3=pickle.loads(pickle.dumps(h1))
 print(h1._histogram())
 print(h3._histogram())
