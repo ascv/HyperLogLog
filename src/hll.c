@@ -175,9 +175,9 @@ HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
         return NULL;
     }
 
-    uint32_t *hash = (uint32_t *) malloc(sizeof(uint32_t));
-    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) hash);
-    return Py_BuildValue("i", *hash);
+    uint32_t hash;
+    MurmurHash3_x86_32((void *) data, dataLength, self->seed, (void *) &hash);
+    return Py_BuildValue("i", hash);
 }
 
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
@@ -248,6 +248,9 @@ HyperLogLog_reduce(HyperLogLog *self)
 
     PyObject *args = Py_BuildValue("(ii)", self->k, self->seed);
     PyObject *registers = Py_BuildValue("s#", arr, self->size);
+
+    free(arr);
+
     return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers);
 }
 
