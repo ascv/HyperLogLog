@@ -44,7 +44,7 @@ Documentation
     add(data)
 
 Adds *data* to the estimator where data is a string, buffer, or bytes
-type.
+type. Returns `True` if the approximated cardinality estimated by the HyperLogLog changed.
 
     HyperLogLog(k, seed=314)
 

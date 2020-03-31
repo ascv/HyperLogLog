@@ -28,6 +28,15 @@ class TestAdd(unittest.TestCase):
         except Exception as ex:
             self.fail('failed to add bytes: %s' % ex)
 
+    def test_cardinality_estimate_changed_return(self):
+        changed = self.hll.add('asdf')
+        self.assertTrue(changed)
+        changed = self.hll.add('asdf')
+        self.assertFalse(changed)
+        changed = self.hll.add('otherdata')
+        self.assertTrue(changed)
+
+
 class TestCardinalityEstimation(unittest.TestCase):
 
     def setUp(self):

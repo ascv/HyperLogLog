@@ -91,10 +91,9 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
     if (rank > self->registers[index]) {
         self->registers[index] = rank;
         self->use_cache = 0;
+        Py_RETURN_TRUE;
     }
-
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_FALSE;
 };
 
 /* Gets a cardinality estimate. */
