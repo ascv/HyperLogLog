@@ -23,6 +23,7 @@ typedef struct {
 static void
 HyperLogLog_dealloc(HyperLogLog* self)
 {
+    free(self->histogram);
     free(self->registers);
     Py_TYPE(self)->tp_free((PyObject*) self);
 }
