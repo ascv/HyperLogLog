@@ -251,7 +251,7 @@ HyperLogLog_reduce(HyperLogLog *self)
 
     free(arr);
 
-    return Py_BuildValue("(OOO)", Py_TYPE(self), args, registers);
+    return Py_BuildValue("(ONN)", Py_TYPE(self), args, registers);
 }
 
 /* Gets a copy of the registers as a bytesarray. */
