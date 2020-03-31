@@ -25,7 +25,7 @@ for k in K:
             hll.add(str(i))
 
         elapsed = time.time() - start
-        relative_err = abs((hll.cardinality()-n)/n)
+        relative_err = abs((1.0*hll.cardinality()-n)/n)
         pct_err = abs(relative_err*100)
 
         out = msg.format(
