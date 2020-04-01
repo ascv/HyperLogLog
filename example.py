@@ -2,13 +2,15 @@ import random
 import time
 import HLL
 
+# valgrind --tool=memcheck --show-leak-kinds=all --leak-check=full --track-origins=yes --suppressions=valgrind-python.supp.1 python -E -tt ./memtest.py
+
 K = [14, 16, 18,]
 N = [5, 50, 500, 5000, 50000, 500000,]
 
 def print_registers(h):
     regs = '|'
     for i in range(h.size()):
-        regs += '{}|'.format(h._get_register(i))
+        regs += '{: <2}|'.format(h._get_register(i))
     print(regs)
 
 
