@@ -1,8 +1,12 @@
 language: python
 python:
-  - "3.5"
+  - "3.8"
+  - "3.7"
+  - "3.6"
   - "3.4"
-  - "3.3"
   - "2.7"
-install: pip install HLL
-script:  python test.py
+install:
+  - python setup.py sdist
+  - pip install dist/HLL-1.2.8.tar.gz
+script:
+  - python test.py
