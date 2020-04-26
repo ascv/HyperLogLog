@@ -286,7 +286,7 @@ HyperLogLog_set_register(HyperLogLog *self, PyObject * args)
     }
 
     if (rank >= 32) {
-        char * msg = "Rank is greater than the maximum possible rank.";
+        char* msg = "Value greater than than the maximum possible rank 32.";
         PyErr_SetString(PyExc_ValueError, msg);
         return NULL;
     }
@@ -316,17 +316,50 @@ HyperLogLog_seed(HyperLogLog* self)
 static PyObject *
 HyperLogLog_set_registers(HyperLogLog *self, PyObject *args)
 {
-    PyByteArrayObject *regs;
+    PyObject *obj;
+    char* registers;
+    uint32_t len;
+    int i;
 
-    if (!PyArg_ParseTuple(args, "O", &regs)) {
+    if (!PyArg_ParseTuple(args, "O", &obj)) {
         return NULL;
     }
 
-    char* registers;
-    registers = PyByteArray_AsString((PyObject*) regs);
+    if (PyByteArray_Check(obj)) {
+        len = PyByteArray_Size(obj);
+        registers = PyByteArray_AsString(obj);
+    }
+
+    else if (PyBytes_Check(obj)) {
+        len = PyBytes_Size(obj);
+        registers = PyBytes_AsString(obj);
+    }
+
+    else {
+        char* msg = "Registers must be a bytearray or bytes type.";
+        PyErr_SetString(PyExc_TypeError, msg);
+        return NULL;
+    }
+
+    if (len != self->size) {
+        char msg[74];
+        sprintf(msg, "Invalid size. Expected %u registers received %u registers.", self->size, len);
+        PyErr_SetString(PyExc_ValueError, msg);
+        return NULL;
+    }
+
     self->use_cache = 0;
 
-    int i;
+    // Check for bad register values
+    for (i = 0; i < self->size; i++) {
+        if (registers[i] > 32) {
+            char* msg = "Value greater than than the maximum possible rank (32).";
+            PyErr_SetString(PyExc_ValueError, msg);
+            return NULL;
+        }
+    }
+
+    // Only set registers if all values are okay
     for (i = 0; i < self->size; i++) {
         self->registers[i] = registers[i];
     }
