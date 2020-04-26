@@ -214,12 +214,33 @@ class TestRegisterFunctions(unittest.TestCase):
     def test_bytesarray_has_correct_length(self):
         self.assertTrue(len(self.hll.registers()) == pow(2, self.k))
 
-    def test_set_registers(self):
+    def test_set_registers_with_bytearray(self):
         expected = bytearray(randint(0, 16) for x in range(32))
         self.hll.set_registers(expected)
 
         registers=self.hll.registers()
         self.assertEqual(expected, registers)
+
+    def test_set_registers_with_bytes(self):
+        expected = bytearray(randint(0, 16) for x in range(32))
+        self.hll.set_registers(bytes(expected))
+
+        registers=self.hll.registers()
+        self.assertEqual(expected, registers)
+
+    @unittest.skipIf(sys.version_info[0] >= 3, 'TypeError raised in Python 3')
+    def test_set_registers_raises_value_error(self):
+        expected = bytearray(range(10, 42))
+
+        with self.assertRaises(ValueError):
+            self.hll.set_registers(bytes(expected))
+
+    @unittest.skipIf(sys.version_info[0] < 3, 'ValueError raised in Python 2')
+    def test_set_registers_raises_type_error(self):
+        expected = bytearray(range(10, 42))
+
+        with self.assertRaises(ValueError):
+            self.hll.set_registers(bytes(expected))
 
 if __name__ == '__main__':
     unittest.main()
