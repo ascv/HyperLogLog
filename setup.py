@@ -9,24 +9,23 @@ setup(
     maintainer='Joshua Andersen',
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[
-        Extension('HLL', ['src/hll.c', 'lib/murmur3.c', 'lib/murmur2.c']),
+        Extension('HLL', ['src/hll.c', 'lib/murmur2.c', ]),
     ],
-    headers=['src/hll.h', 'lib/murmur3.h', 'lib/murmur2.h'],
+    headers=['src/hll.h', 'lib/murmur2.h', ],
     keywords=['HyperLogLog', 'Hyper LogLog', 'Hyper Log Log', 'LogLog', 'Log Log', 'cardinality', 'counting', 'sketch'],
     license='MIT',
     long_description=\
 """
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
-cardinality of extraordinarily large data sets. This implementation [2] is
-written in C. Specifically
+cardinality of extraordinarily large data sets. This library implements a 64
+bit variant [2] written in C that uses a MurmurHash64A hash function.
 
-* Improved version of the algorithm eliminates the need to do any bias
-  correction
-* Uses the 64 bit MurmurHash64A hash function
-* 6 bit register encoding
-* No bias correction (e.g. HLL+, SlidingHyperLogLog [3]) since it isn't
+[1] Flajolet, Philippe; Fusy, Eric; Gandouet, Olivier; Meunier, Frederic
+(2007). "Hyperloglog: The analysis of a near-optimal cardinality estimation
+algorithm" (PDF). Disc. Math. and Theor. Comp. Sci. Proceedings. AH: 127146.
+CiteSeerX 10.1.1.76.4286.
 
-[1] http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf
-[2] New Paper
+[2] Omar Ertl, "New cardinality estimation algorithms for HyperLogLog Sketches"
+arXiv:1702.01284 [cs] Feb. 2017.
 """
 )

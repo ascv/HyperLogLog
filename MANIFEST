@@ -1,6 +1,6 @@
 src/hll.c
 src/hll.h
-lib/murmur3.c
-lib/murmur3.h
+lib/murmur2.c
+lib/murmur2.h
 test.py
 setup.py
