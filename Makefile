@@ -11,3 +11,6 @@ install:
 remove:
 	python setup.py uninstall HLL
 	python3 setup.py uninstall HLL
+distribute:
+	python3 setup.py sdist
+	python3 -m twine upload dist/*
