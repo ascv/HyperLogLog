@@ -64,8 +64,8 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
-    self->histogram = (uint64_t *)calloc(65, sizeof(uint64_t));
-    self->histogram[0] = self->size;
+    self->histogram = (uint64_t *)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
+    self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
 
@@ -94,14 +94,16 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 
     if (newFsb > fsb) {
         setReg(index, (uint8_t)newFsb, self->registers);
-        self->histogram[newFsb] += 1;
+        self->histogram[newFsb] += 1; /* Increment the new count */
         self->isCached = 0;
 
         if (self->histogram[fsb] > 0) {
-            self->histogram[fsb] -= 1;
+            self->histogram[fsb] -= 1; /* Decrement the old count */
         }
 
-        self->histogram[0] += 1;
+        else {
+            self->histogram[0] += 1; /* Increment the zeroes count */
+        }
         Py_RETURN_TRUE;
     }
 
@@ -207,8 +209,15 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 
         if (oldVal < newVal) {
             setReg(i, newVal, self->registers);
-            self->histogram[newVal] += 1;
-            self->histogram[oldVal] -= 1;
+            self->histogram[newVal] += 1; /* Increment new count */
+
+            if (self->histogram[oldVal] > 0) {
+                self->histogram[oldVal] -= 1; /* Decrement old count */
+            }
+
+            else {
+                self->histogram[0] += 1; /* Increment zeroes count */
+            }
         }
 
         Py_DECREF(newReg);
