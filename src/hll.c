@@ -1,3 +1,5 @@
+#define PY_SSIZE_T_CLEAN
+
 #include <math.h>
 #include <Python.h>
 #include <stdbool.h>
@@ -71,7 +73,7 @@ static PyObject *
 HyperLogLog_add(HyperLogLog *self, PyObject *args)
 {
     const char *data;
-    const uint32_t dataLength;
+    const Py_ssize_t dataLength;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLength))
         return NULL;
@@ -168,7 +170,7 @@ static PyObject *
 HyperLogLog_murmur3_hash(HyperLogLog *self, PyObject *args)
 {
     const char *data;
-    const uint32_t dataLength;
+    const Py_ssize_t dataLength;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLength)) {
         return NULL;
