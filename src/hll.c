@@ -168,13 +168,12 @@ HyperLogLog_hash(HyperLogLog *self, PyObject *args)
 static PyObject *
 HyperLogLog__histogram(HyperLogLog *self)
 {
-    PyObject* histogram = PyList_New(64);
+    PyObject* histogram = PyList_New(65);
 
-    /* We skip first value since it contains the size + count */
-    for (int i = 1; i < 65; i++)
+    for (int i = 0; i < 65; i++)
     {
         PyObject* count = Py_BuildValue("i", self->histogram[i]);
-        PyList_SetItem(histogram, (i-1), count);
+        PyList_SetItem(histogram, i, count);
     }
     return histogram;
 }
@@ -234,16 +233,16 @@ static PyObject *
 HyperLogLog_reduce(HyperLogLog *self)
 {
     PyObject* val;
-    PyObject* state = PyList_New(self->size + 64);
+    PyObject* state = PyList_New(self->size + 65);
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 65; i++) {
         val = Py_BuildValue("k", self->histogram[i]);
         PyList_SetItem(state, i, val);
     }
 
-    for (uint64_t i = 64; i < self->size + 64; i++)
+    for (uint64_t i = 65; i < self->size + 65; i++)
     {
-        val = Py_BuildValue("k", getReg(i - 64, self->registers));
+        val = Py_BuildValue("k", getReg(i - 65, self->registers));
         PyList_SetItem(state, i, val);
     }
 
@@ -268,17 +267,17 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 65; i++) {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
         self->histogram[i] = val;
     }
 
-    for (uint64_t i = 64; i < self->size + 64; i++)
+    for (uint64_t i = 65; i < self->size + 65; i++)
     {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
-        setReg(i-64, (uint8_t)val, self->registers);
+        setReg(i-63, (uint8_t)val, self->registers);
     }
 
     Py_INCREF(Py_None);
