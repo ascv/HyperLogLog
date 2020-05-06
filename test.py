@@ -54,10 +54,10 @@ class TestHyperLogLogConstructor(unittest.TestCase):
         for i in range(hll.size()):
             self.assertEqual(hll._get_register(i), 0)
 
-    def test_histogram_initialized_to_zero(self):
+    def test_histogram_initialized_with_correct_counts(self):
         hll = HyperLogLog(5)
         hist = hll._histogram()
-        self.assertEqual(sum(hist), 0)
+        self.assertEqual(sum(hist), 32)
 
     def test_p_sets_size(self):
         for i in range(2, 6):
