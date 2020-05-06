@@ -60,7 +60,9 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->registers = (char *)calloc(bytes, sizeof(char));
 
     if (self->registers == NULL) {
-        setMemoryErrorMsg(bytes);
+        char *msg = (char *) malloc(128 * sizeof(char));
+        sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+        PyErr_SetString(PyExc_MemoryError, msg);
         return -1;
     }
 
@@ -741,14 +743,6 @@ void printByte(char b)
     for (int i = 0; i < 8; i++) {
         printf("%d", !!((b << i) & 0x80));
     }
-}
-
-/* Set an error message. */
-void setMemoryErrorMsg(uint64_t bytes)
-{
-    char *msg = (char *) malloc(128 * sizeof(char));
-    sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
-    PyErr_SetString(PyExc_MemoryError, msg);
 }
 
 /* Check if a register index is valid, if not then set an error message. */
