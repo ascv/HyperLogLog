@@ -183,15 +183,16 @@ static PyObject *
 HyperLogLog_merge(HyperLogLog *self, PyObject * args)
 {
     PyObject *hll;
+    uint64_t hllSize;
 
     if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
 
     PyObject *size = PyObject_CallMethod(hll, "size", NULL);
 
     #if PY_MAJOR_VERSION >= 3
-        long hllSize = PyLong_AsLong(size);
+        hllSize = PyLong_AsLong(size);
     #else
-        long hllSize = PyInt_AS_LONG(size);
+        hllSize = PyInt_AS_LONG(size);
     #endif
 
     if (hllSize > self->size) {
@@ -238,7 +239,7 @@ HyperLogLog_reduce(HyperLogLog *self)
         PyList_SetItem(state, i, val);
     }
 
-    for (int i = 64; i < self->size + 64; i++)
+    for (uint64_t i = 64; i < self->size + 64; i++)
     {
         val = Py_BuildValue("k", getReg(i - 64, self->registers));
         PyList_SetItem(state, i, val);
@@ -271,7 +272,7 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
         self->histogram[i] = val;
     }
 
-    for (int i = 64; i < self->size + 64; i++)
+    for (uint64_t i = 64; i < self->size + 64; i++)
     {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
