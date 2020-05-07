@@ -675,19 +675,15 @@ static inline uint8_t clz(uint64_t x) {
     /* Do a binary search to find which byte contains the first set bit. */
     if (x >= (1UL << 32UL)) {
         if (x >= (1UL << 48UL)) {
-            if (x >= (1UL << 56UL)) shift = 56;
-            else shift = 48;
+            shift = (x >= (1UL << 56UL)) ? 56 : 48;
         } else {
-            if (x >= (1UL << 38UL)) shift = 40;
-            else shift = 32;
+            shift = (x >= (1UL << 38UL)) ? 40 : 32;
         }
     } else {
         if (x >= (1U << 16U)) {
-            if (x >= (1U << 24U)) shift = 24;
-            else shift = 16;
+            shift = (x >= (1U << 24U)) ? 24 : 16;
         } else {
-            if (x >= (1U << 8U)) shift = 8;
-            else shift = 0;
+            shift = (x >= (1U << 8U)) ? 8 : 0;
         }
     }
 
