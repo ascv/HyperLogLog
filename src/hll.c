@@ -12,7 +12,7 @@
 
 typedef struct {
     PyObject_HEAD
-    char * registers; /* Contains the first set bit positions */
+    char* registers; /* Contains the first set bit positions */
     unsigned short p; /* 2^p = number of registers */
     uint64_t * histogram; /* Register histogram */
     uint64_t seed; /* MurmurHash64A seed */
@@ -30,18 +30,18 @@ HyperLogLog_dealloc(HyperLogLog* self)
     Py_TYPE(self)->tp_free((PyObject*) self);
 }
 
-static PyObject *
-HyperLogLog_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+static PyObject*
+HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
 {
-    HyperLogLog *self;
-    self = (HyperLogLog *)type->tp_alloc(type, 0);
-    return (PyObject *)self;
+    HyperLogLog* self;
+    self = (HyperLogLog*)type->tp_alloc(type, 0);
+    return (PyObject*)self;
 }
 
 static int
-HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
+HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 {
-    static char *kwlist[] = {"p", "seed"};
+    static char* kwlist[] = {"p", "seed"};
     self->seed = 314;
 
     if (!PyArg_ParseTupleAndKeywords(
@@ -50,7 +50,7 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     }
 
     if (self->p < 2 || self->p > 63) {
-        char * msg = "p is out of range";
+        char* msg = "p is out of range";
         PyErr_SetString(PyExc_ValueError, msg);
         return -1;
     }
@@ -60,13 +60,13 @@ HyperLogLog_init(HyperLogLog *self, PyObject *args, PyObject *kwds)
     self->registers = (char *)calloc(bytes, sizeof(char));
 
     if (self->registers == NULL) {
-        char *msg = (char *) malloc(128 * sizeof(char));
+        char* msg = (char*) malloc(128 * sizeof(char));
         sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
         PyErr_SetString(PyExc_MemoryError, msg);
         return -1;
     }
 
-    self->histogram = (uint64_t *)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
+    self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
@@ -79,15 +79,15 @@ static PyMemberDef HyperLogLog_members[] = {
 };
 
 /* Add an element. */
-static PyObject *
-HyperLogLog_add(HyperLogLog *self, PyObject *args)
+static PyObject*
+HyperLogLog_add(HyperLogLog* self, PyObject* args)
 {
-    const char *data;
+    const char* data;
     const uint64_t dataLen;
     uint64_t hash, index, fsb, newFsb;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
-    hash = MurmurHash64A((void *)data, dataLen, self->seed);
+    hash = MurmurHash64A((void*)data, dataLen, self->seed);
 
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
     fsb = getReg(index, self->registers); /* Pick a register */
@@ -106,6 +106,7 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
         else {
             self->histogram[0] += 1; /* Increment the zeroes count */
         }
+
         Py_RETURN_TRUE;
     }
 
@@ -113,8 +114,8 @@ HyperLogLog_add(HyperLogLog *self, PyObject *args)
 };
 
 /* Get a cardinality estimate */
-static PyObject *
-HyperLogLog_cardinality(HyperLogLog *self)
+static PyObject*
+HyperLogLog_cardinality(HyperLogLog* self)
 {
     if (self->isCached) {
         return Py_BuildValue("K", self->cache);
@@ -140,8 +141,8 @@ HyperLogLog_cardinality(HyperLogLog *self)
 }
 
 /* Gets the the Murmur hash seed. */
-static PyObject *
-HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
+static PyObject*
+HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 {
     unsigned long index;
 
@@ -152,21 +153,21 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject * args)
 }
 
 /* Get a Murmur64A hash of a string, buffer or bytes object. */
-static PyObject *
-HyperLogLog_hash(HyperLogLog *self, PyObject *args)
+static PyObject*
+HyperLogLog_hash(HyperLogLog* self, PyObject* args)
 {
-    const char *data;
+    const char* data;
     const uint64_t dataLen;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
 
-    uint64_t hash = MurmurHash64A((void *) data, dataLen, self->seed);
+    uint64_t hash = MurmurHash64A((void*) data, dataLen, self->seed);
     return Py_BuildValue("K", hash);
 }
 
 /* Gets a histogram of first set bit positions as a list of ints. */
-static PyObject *
-HyperLogLog__histogram(HyperLogLog *self)
+static PyObject*
+HyperLogLog__histogram(HyperLogLog* self)
 {
     PyObject* histogram = PyList_New(65);
 
@@ -180,15 +181,15 @@ HyperLogLog__histogram(HyperLogLog *self)
 
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
  * the other HyperLogLog are unaffected. */
-static PyObject *
-HyperLogLog_merge(HyperLogLog *self, PyObject * args)
+static PyObject*
+HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 {
-    PyObject *hll;
+    PyObject* hll;
     uint64_t hllSize;
 
     if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
 
-    PyObject *size = PyObject_CallMethod(hll, "size", NULL);
+    PyObject* size = PyObject_CallMethod(hll, "size", NULL);
 
     #if PY_MAJOR_VERSION >= 3
         hllSize = PyLong_AsLong(size);
@@ -205,7 +206,7 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     self->isCached = 0;
 
     for (uint64_t i = 0; i < self->size; i++) {
-        PyObject *newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
+        PyObject* newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
         unsigned long newVal = PyLong_AsUnsignedLong(newReg);
         uint64_t oldVal = getReg(i, self->registers);
 
@@ -229,8 +230,8 @@ HyperLogLog_merge(HyperLogLog *self, PyObject * args)
     return Py_None;
 }
 
-static PyObject *
-HyperLogLog_reduce(HyperLogLog *self)
+static PyObject*
+HyperLogLog_reduce(HyperLogLog* self)
 {
     PyObject* val;
     PyObject* state = PyList_New(self->size + 65);
@@ -246,19 +247,19 @@ HyperLogLog_reduce(HyperLogLog *self)
         PyList_SetItem(state, i, val);
     }
 
-    PyObject *args = Py_BuildValue("(ii)", self->p, self->seed);
+    PyObject* args = Py_BuildValue("(ii)", self->p, self->seed);
     return Py_BuildValue("(ONN)", Py_TYPE(self), args, state);
 }
 
 /* Gets the seed value used in the Murmur hash. */
-static PyObject *
+static PyObject*
 HyperLogLog_seed(HyperLogLog* self)
 {
     return Py_BuildValue("k", self->seed);
 }
 
-static PyObject *
-HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
+static PyObject*
+HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 {
 
     PyObject* dump;
@@ -285,7 +286,7 @@ HyperLogLog_set_state(HyperLogLog * self, PyObject * state)
 }
 
 /* Gets the number of registers. */
-static PyObject *
+static PyObject*
 HyperLogLog_size(HyperLogLog* self)
 {
     return Py_BuildValue("i", self->size);
@@ -385,7 +386,7 @@ static PyTypeObject HyperLogLogType = {
     PyMODINIT_FUNC
     PyInit_HLL(void)
 #else
-    /* declarations for DLL import/export */
+    /* declarations for DLL import or export */
     #ifndef PyMODINIT_FUNC
         #define PyMODINIT_FUNC void
     #endif
@@ -400,13 +401,13 @@ static PyTypeObject HyperLogLogType = {
         if (m == NULL) return NULL;
     #else
         if (PyType_Ready(&HyperLogLogType) < 0) return;
-        char *info = "HyperLogLog cardinality estimator.";
+        char* info = "HyperLogLog cardinality estimator.";
         m = Py_InitModule3("HLL", module_methods, info);
         if (m == NULL) return;
     #endif
 
     Py_INCREF(&HyperLogLogType);
-    PyModule_AddObject(m, "HyperLogLog", (PyObject *)&HyperLogLogType);
+    PyModule_AddObject(m, "HyperLogLog", (PyObject*)&HyperLogLogType);
 
     #if PY_MAJOR_VERSION >= 3
         return m;
@@ -590,7 +591,7 @@ static PyTypeObject HyperLogLogType = {
  */
 
 /* Get register m. */
-static inline uint64_t getReg(uint64_t m, char * regs)
+static inline uint64_t getReg(uint64_t m, char* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -608,7 +609,7 @@ static inline uint64_t getReg(uint64_t m, char * regs)
 }
 
 /* Set register m to n. */
-static inline void setReg(uint64_t m, uint8_t n, char *regs)
+static inline void setReg(uint64_t m, uint8_t n, char* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -750,7 +751,7 @@ uint8_t isValidIndex(uint64_t index, uint64_t size)
     uint8_t valid = 1;
 
     if (index > size - 1) {
-        char * msg = "Index exceeds the number of registers.";
+        char* msg = "Index exceeds the number of registers.";
         PyErr_SetString(PyExc_IndexError, msg);
         valid = 0;
     }
