@@ -34,7 +34,7 @@ typedef struct {
 typedef struct Node {
     struct Node* next;
     uint64_t index;
-    char val;
+    char fsb;
 } Node;
 
 
@@ -68,13 +68,16 @@ typedef struct Node {
  * instead keep a temporary buffer of elements. Added elements are first
  * put into the buffer. When the buffer is full or cardinality() is called
  * then the elements in the buffer are sorted and added to the list. Since
- * both the buffer and list are sorted we can update the list in O(n).
+ * both the buffer and list are sorted we can iterate over both lists together
+ * in one pass.
  */
 
-/* Attempts to add registers in the buffer to the linked list of registers */
+/* Clears the temporary buffer of registers and tries to add them to the
+ * linked list of registers.
+ */
 void flushRegisterBuffer(HyperLogLog* self)
 {
-    int i;
+    uint64_t i;
 
     struct Node* node;
     struct Node *next = NULL;
@@ -85,7 +88,7 @@ void flushRegisterBuffer(HyperLogLog* self)
 
         /* Create the new node from the element in the buffer */
         node = (struct Node*)malloc(sizeof(struct Node));
-        node->val = self->registerBuffer[i].val;
+        node->fsb = self->registerBuffer[i].fsb;
         node->index = self->registerBuffer[i].index;
         node->next = NULL;
 
@@ -105,7 +108,6 @@ void flushRegisterBuffer(HyperLogLog* self)
 
         //TODO: add logic to switch between sparse encoding and dense encoding
         while (current != NULL) {
-            //printf("    current %lu %u insert %lu %u ", current->index, current->val, node->index, node->val);
 
             /* Is the node before the current node? */
             if (current->index > node->index) {
@@ -124,17 +126,17 @@ void flushRegisterBuffer(HyperLogLog* self)
                 }
 
                 self->histogram[0]--;
-                self->histogram[(uint8_t)node->val]++;
+                self->histogram[(uint8_t)node->fsb]++;
                 break;
             }
 
             /* Are we updating an existing node? */
             else if (current->index == node->index) {
-                if (node->val > current->val) {
+                if (node->fsb > current->fsb) {
 
-                    self->histogram[(uint8_t)current->val]--;
-                    self->histogram[(uint8_t)node->val]++;
-                    current->val = node->val;
+                    self->histogram[(uint8_t)current->fsb]--;
+                    self->histogram[(uint8_t)node->fsb]++;
+                    current->fsb = node->fsb;
                     prev = current;
                 }
                 break;
@@ -144,7 +146,7 @@ void flushRegisterBuffer(HyperLogLog* self)
 
                 /* Is the node the new tail? */
                 if (current->next == NULL) {
-                    self->histogram[(uint8_t)node->val]++;
+                    self->histogram[(uint8_t)node->fsb]++;
                     self->histogram[0]--;
                     current->next = node;
                     prev = current;
@@ -154,7 +156,7 @@ void flushRegisterBuffer(HyperLogLog* self)
 
                     /* Are we inserting between this node and the next one? */
                     if (current->next->index > node->index) {
-                        self->histogram[(uint8_t)node->val]++;
+                        self->histogram[(uint8_t)node->fsb]++;
                         self->histogram[0]--;
                         next = current->next;
                         current->next = node;
@@ -178,13 +180,14 @@ void printSparseRegisters(HyperLogLog* self)
     struct Node *next = NULL;
     struct Node *current = self->sparseRegisterList;
     int i =0;
+    int max = 100;
     while (current != NULL) {
-        printf("%lu - %u\n", current->index, current->val);
+        printf("%lu - %u\n", current->index, current->fsb);
         next = current->next;
         current = next;
         i++;
 
-        if (i > 30) {
+        if (i > max) {
             printf("\nmax register iterations reached\n");
             return;
         }
@@ -198,10 +201,10 @@ int nodeComp(const void* a, const void* b) {
     int result = -1;
 
     if (A->index == B->index) {
-        if (A->val > B->val) {
+        if (A->fsb > B->fsb) {
             result = 1;
         }
-        else if (A->val < B->val) {
+        else if (A->fsb < B->fsb) {
             result = -1;
         }
         else {
@@ -213,31 +216,26 @@ int nodeComp(const void* a, const void* b) {
         result = 1;
     }
 
-    //printf("comparing (%lu, %u) vs (%lu, %u) -> %i \n", A->index, A->val, B->index, B->val, result);
-
     return result;
 }
 
-void setSparseReg(HyperLogLog* self, uint64_t index, uint8_t val) {
-    //printf("setSparseReg(): index %lu val %u\n", index, val);
+void setSparseReg(HyperLogLog* self, uint64_t index, char fsb) {
 
     if (self->bufferCount < self->maxBufferCount) {
         struct Node* node = (struct Node*)malloc(sizeof(struct Node));
         node->index = index;
-        node->val = (char)val;
+        node->fsb = fsb;
         self->registerBuffer[self->bufferCount] = *node;
         self->bufferCount++;
     }
 
     else {
-        //printf("setSparseReg(): buffer full\n");
         qsort(self->registerBuffer, self->bufferCount, sizeof(struct Node), nodeComp);
-        //printf("setSparseReg(): flushing buffer \n");
         flushRegisterBuffer(self);
 
         struct Node* node = (struct Node*)malloc(sizeof(struct Node));
         self->bufferCount = 1;
-        node->val = val;
+        node->fsb = fsb;
         node->index = index;
         self->registerBuffer[0] = *node;
     }
@@ -323,7 +321,7 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     newFsb = clz(newFsb) + 1; /* Find the first set bit */
 
     if (self->isSparse) {
-        setSparseReg(self, index + 1, (uint8_t)newFsb);
+        setSparseReg(self, index + 1, newFsb);
         self->isCached = 0;
     }
 
@@ -355,7 +353,6 @@ HyperLogLog_cardinality(HyperLogLog* self)
     }
 
     else if (self->isSparse && self->bufferCount > 0) {
-        //printf("cardinality(): flushing..\n");
         flushRegisterBuffer(self);
         //printSparseRegisters(self);
     }
