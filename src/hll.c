@@ -71,6 +71,24 @@ typedef struct Node {
  * both the buffer and list are sorted we can iterate over both lists together
  * in one pass.
  */
+void printSparseRegisters(HyperLogLog* self)
+{
+    struct Node *next = NULL;
+    struct Node *current = self->sparseRegisterList;
+    int i =0;
+    int max = 100;
+    while (current != NULL) {
+        printf("\t%lu - %u\n", current->index, current->fsb);
+        next = current->next;
+        current = next;
+        i++;
+
+        if (i > max) {
+            printf("\n\tmax register iterations reached\n");
+            return;
+        }
+    }
+}
 
 /* Clears the temporary buffer of registers and tries to add them to the
  * linked list of registers.
@@ -86,113 +104,94 @@ void flushRegisterBuffer(HyperLogLog* self)
 
     for (i = 0; i < self->bufferCount; i++) {
 
+        int safety = 0;
+
         /* Create the new node from the element in the buffer */
         node = (struct Node*)malloc(sizeof(struct Node));
         node->fsb = self->registerBuffer[i].fsb;
         node->index = self->registerBuffer[i].index;
         node->next = NULL;
+        printf("trying to insert node (%lu) fsb %u\n", node->index, node->fsb);
 
         /* If head doesn't exist then set it */
         if (self->sparseRegisterList == NULL) {
             self->sparseRegisterList = node;
+            prev = node;
+            printf("created head\n");
             continue;
         }
 
-        /* Do we re-use the last pointer? */
-        if (prev != NULL) {
-            current = prev;
-        }
-        else {
-            current = self->sparseRegisterList;
-        }
+        current = self->sparseRegisterList;
 
-        //TODO: add logic to switch between sparse encoding and dense encoding
         while (current != NULL) {
 
-            /* Is the node before the current node? */
-            if (current->index > node->index) {
+            printf("\tcurrent (%lu, %u) vs node (%lu, %u): ", current->index, current->fsb, node->index, node->fsb);
 
-                /* Is it the new head */
-                if (prev == NULL || (current->index == prev->index)) {
-                    prev = node;
-                    node->next = current;
-                    self->sparseRegisterList = node;
-                }
+            printf("0");
 
-                /* Make sure that we're not at the start of the list */
-                else if (current->index != prev->index) {
-                    prev->next = node;
-                    node->next = current;
-                }
-
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
+            if (current->next == NULL) {
+                current->next = node;
+                printf("|1\n");
                 break;
             }
 
-            /* Are we updating an existing node? */
-            else if (current->index == node->index) {
-                if (node->fsb > current->fsb) {
 
-                    self->histogram[(uint8_t)current->fsb]--;
-                    self->histogram[(uint8_t)node->fsb]++;
+            if (current->index == node->index) {
+                printf("|2");
+                if (current->fsb < node->fsb) {
                     current->fsb = node->fsb;
-                    prev = current;
+                    printf("|3\n");
                 }
                 break;
             }
 
-            else if (node->index > current->index) {
+            if (current->index > node->index) {
+                node->next = current;
+                printf("|4\n");
 
-                /* Is the node the new tail? */
-                if (current->next == NULL) {
-                    self->histogram[(uint8_t)node->fsb]++;
-                    self->histogram[0]--;
-                    current->next = node;
-                    prev = current;
-                    break;
-                }
-                else if (current->next != NULL) {
-
-                    /* Are we inserting between this node and the next one? */
-                    if (current->next->index > node->index) {
-                        self->histogram[(uint8_t)node->fsb]++;
-                        self->histogram[0]--;
-                        next = current->next;
-                        current->next = node;
-                        node->next = next;
-                        prev = current;
-                        break;
-                    }
-                }
+                if (self->sparseRegisterList->index > node->index) {
+                    self->sparseRegisterList = node;
+                };
+                break;
             }
 
+            if (current->next->index > node->index) {
+                node->next = current->next;
+                current->next = node;
+                printf("|5\n");
+                break;
+            }
+
+            if (current->index > node->index) {
+                node->next = current;
+                printf("|6\n");
+                break;
+            }
+
+            if (current->next == NULL) {
+                current->next = node;
+                printf("|7\n");
+                break;
+            }
             next = current->next;
             current = next;
+            printf("|8\n");
+
+            safety++;
+
+            if (safety > 10) {
+                printf("|9\n");
+                break;
+            }
         }
+        printf("\n");
+        printSparseRegisters(self);
+        printf("\n");
     }
 
     self->bufferCount = 0;
 }
 
-void printSparseRegisters(HyperLogLog* self)
-{
-    struct Node *next = NULL;
-    struct Node *current = self->sparseRegisterList;
-    int i =0;
-    int max = 100;
-    while (current != NULL) {
-        printf("%lu - %u\n", current->index, current->fsb);
-        next = current->next;
-        current = next;
-        i++;
-
-        if (i > max) {
-            printf("\nmax register iterations reached\n");
-            return;
-        }
-    }
-}
 
 int nodeComp(const void* a, const void* b) {
     struct Node* A = (struct Node*) a;
@@ -293,6 +292,11 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->isSparse = 0; //TODO: check for option to enable disable
     self->maxBufferCount = 1024;
 
+    if (self->seed == 100) {
+        self->seed = 314;
+        self->isSparse = 1;
+    }
+
     if (self->isSparse) {
         self->registerBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferCount);
     }
@@ -319,9 +323,10 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     fsb = getReg(index, self->registers); /* Pick a register */
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit */
+    //printf("FSB (%lu): %lu\n", index, newFsb);
 
     if (self->isSparse) {
-        setSparseReg(self, index + 1, newFsb);
+        setSparseReg(self, index, newFsb);
         self->isCached = 0;
     }
 
@@ -372,6 +377,10 @@ HyperLogLog_cardinality(HyperLogLog* self)
 
     self->cache = estimate;
     self->isCached = 1;
+
+    if (self->isSparse) {
+        printSparseRegisters(self);
+    }
 
     return Py_BuildValue("K", estimate);
 }
