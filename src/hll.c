@@ -90,128 +90,6 @@ void printSparseRegisters(HyperLogLog* self)
     }
 }
 
-/* Clears the temporary buffer of registers and tries to add them to the
- * linked list of registers.
- */
-void flushRegisterBuffer(HyperLogLog* self)
-{
-    uint64_t i;
-
-    struct Node* node;
-    struct Node *next = NULL;
-    struct Node *current = self->sparseRegisterList;
-    struct Node *prev = NULL;
-
-    for (i = 0; i < self->bufferCount; i++) {
-
-        int safety = 0;
-
-        /* Create the new node from the element in the buffer */
-        node = (struct Node*)malloc(sizeof(struct Node));
-        node->fsb = self->registerBuffer[i].fsb;
-        node->index = self->registerBuffer[i].index;
-        node->next = NULL;
-        printf("node (%lu) fsb %u\n", node->index, node->fsb);
-
-        /* If head doesn't exist then set it */
-        if (self->sparseRegisterList == NULL) {
-            self->sparseRegisterList = node;
-            printf("created head\n");
-            self->histogram[0]--;
-            self->histogram[(uint8_t)node->fsb]++;
-            continue;
-        }
-
-        current = self->sparseRegisterList;
-
-        while (current != NULL) {
-
-            printf("\tcurrent (%lu, %u) vs node (%lu, %u): ", current->index, current->fsb, node->index, node->fsb);
-            printf("0");
-
-            // we're at the tail
-            if (current->next == NULL) {
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                printf("|1\n");
-                break;
-            }
-
-
-            // same index
-            if (current->index == node->index) {
-                printf("|2");
-                if (current->fsb < node->fsb) {
-                    self->histogram[(uint8_t)current->fsb]--;
-                    self->histogram[(uint8_t)node->fsb]++;
-                    current->fsb = node->fsb;
-                    printf("|3\n");
-                }
-                break;
-            }
-
-            // ahead of node
-            if (current->index > node->index) {
-                node->next = current;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                printf("|4\n");
-
-                if (self->sparseRegisterList->index > node->index) {
-                    self->sparseRegisterList = node;
-                };
-                break;
-            }
-
-            // next node is too big
-            if (current->next->index > node->index) {
-                node->next = current->next;
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                printf("|5\n");
-                break;
-            }
-
-            // above nod3
-            if (current->index > node->index) {
-                node->next = current;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                printf("|6\n");
-                break;
-            }
-
-            // we're at the tail
-            if (current->next == NULL) {
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                printf("|7\n");
-                break;
-            }
-
-            next = current->next;
-            current = next;
-            printf("|8\n");
-
-            safety++;
-
-            if (safety > 100) {
-                printf("|9\n");
-                break;
-            }
-        }
-        printf("\n");
-        printSparseRegisters(self);
-        printf("\n");
-    }
-
-    self->bufferCount = 0;
-}
-
-
 int nodeComp(const void* a, const void* b) {
     struct Node* A = (struct Node*) a;
     struct Node* B = (struct Node*) b;
@@ -237,6 +115,111 @@ int nodeComp(const void* a, const void* b) {
     return result;
 }
 
+/* Clears the temporary buffer of registers and tries to add them to the
+ * linked list of registers.
+ */
+void flushRegisterBuffer(HyperLogLog* self)
+{
+    uint64_t i;
+
+    struct Node* node;
+    struct Node *next = NULL;
+    struct Node *current = self->sparseRegisterList;
+    struct Node *prev = NULL;
+
+    qsort(self->registerBuffer, self->bufferCount, sizeof(struct Node), nodeComp);
+
+    for (i = 0; i < self->bufferCount; i++) {
+
+        int safety = 0;
+
+        /* Create the new node from the element in the buffer */
+        node = (struct Node*)malloc(sizeof(struct Node));
+        node->fsb = self->registerBuffer[i].fsb;
+        node->index = self->registerBuffer[i].index;
+        node->next = NULL;
+        printf("inserting node (%lu) fsb %u\n", node->index, node->fsb);
+
+        /* If head doesn't exist then set it */
+        if (self->sparseRegisterList == NULL) {
+            self->sparseRegisterList = node;
+            printf("\tcreated head\n");
+            self->histogram[0]--;
+            self->histogram[(uint8_t)node->fsb]++;
+            continue;
+        }
+
+        current = self->sparseRegisterList;
+
+        while (current != NULL) {
+
+            printf("\tcurrent (%lu, %u) vs node (%lu, %u): ", current->index, current->fsb, node->index, node->fsb);
+            printf("0");
+
+            // Are we updating an existing node?
+            if (current->index == node->index) {
+                printf("|2");
+                if (current->fsb < node->fsb) {
+                    self->histogram[(uint8_t)current->fsb]--;
+                    self->histogram[(uint8_t)node->fsb]++;
+                    current->fsb = node->fsb;
+                    printf("|3\n");
+                }
+                prev = current;
+                break;
+            }
+
+            // Are we the new head?
+            if (current->index > node->index) {
+                printf("|4\n");
+                node->next = current;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                self->sparseRegisterList = node;
+                break;
+            }
+
+            // Are we the tail?
+            if (current->next == NULL) {
+                current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                printf("|1\n");
+                break;
+            }
+
+            // Are we between nodes?
+            if (current->next->index > node->index) {
+                node->next = current->next;
+                current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                printf("|5\n");
+                break;
+            }
+
+            next = current->next;
+            current = next;
+            printf("|8\n");
+
+            safety++;
+
+            if (safety > 100) {
+                printf("|9\n");
+                break;
+            }
+        }
+
+        printf("\nsparse registers:\n");
+        printSparseRegisters(self);
+        printf("\n");
+    }
+
+    self->bufferCount = 0;
+}
+
+
+
 void setSparseReg(HyperLogLog* self, uint64_t index, char fsb) {
 
     if (self->bufferCount < self->maxBufferCount) {
@@ -248,7 +231,6 @@ void setSparseReg(HyperLogLog* self, uint64_t index, char fsb) {
     }
 
     else {
-        qsort(self->registerBuffer, self->bufferCount, sizeof(struct Node), nodeComp);
         flushRegisterBuffer(self);
 
         struct Node* node = (struct Node*)malloc(sizeof(struct Node));
@@ -378,7 +360,6 @@ HyperLogLog_cardinality(HyperLogLog* self)
 
     else if (self->isSparse && self->bufferCount > 0) {
         flushRegisterBuffer(self);
-        //printSparseRegisters(self);
     }
 
     double alpha = 0.7213475;
