@@ -111,13 +111,14 @@ void flushRegisterBuffer(HyperLogLog* self)
         node->fsb = self->registerBuffer[i].fsb;
         node->index = self->registerBuffer[i].index;
         node->next = NULL;
-        printf("trying to insert node (%lu) fsb %u\n", node->index, node->fsb);
+        printf("node (%lu) fsb %u\n", node->index, node->fsb);
 
         /* If head doesn't exist then set it */
         if (self->sparseRegisterList == NULL) {
             self->sparseRegisterList = node;
-            prev = node;
             printf("created head\n");
+            self->histogram[0]--;
+            self->histogram[(uint8_t)node->fsb]++;
             continue;
         }
 
@@ -126,27 +127,35 @@ void flushRegisterBuffer(HyperLogLog* self)
         while (current != NULL) {
 
             printf("\tcurrent (%lu, %u) vs node (%lu, %u): ", current->index, current->fsb, node->index, node->fsb);
-
             printf("0");
 
+            // we're at the tail
             if (current->next == NULL) {
                 current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
                 printf("|1\n");
                 break;
             }
 
 
+            // same index
             if (current->index == node->index) {
                 printf("|2");
                 if (current->fsb < node->fsb) {
                     current->fsb = node->fsb;
+                    self->histogram[(uint8_t)current->fsb]--;
+                    self->histogram[(uint8_t)node->fsb]++;
                     printf("|3\n");
                 }
                 break;
             }
 
+            // ahead of node
             if (current->index > node->index) {
                 node->next = current;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
                 printf("|4\n");
 
                 if (self->sparseRegisterList->index > node->index) {
@@ -155,31 +164,41 @@ void flushRegisterBuffer(HyperLogLog* self)
                 break;
             }
 
+            // next node is too big
             if (current->next->index > node->index) {
                 node->next = current->next;
                 current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
                 printf("|5\n");
                 break;
             }
 
+            // above nod3
             if (current->index > node->index) {
                 node->next = current;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
                 printf("|6\n");
                 break;
             }
 
+            // we're at the tail
             if (current->next == NULL) {
                 current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
                 printf("|7\n");
                 break;
             }
+
             next = current->next;
             current = next;
             printf("|8\n");
 
             safety++;
 
-            if (safety > 10) {
+            if (safety > 100) {
                 printf("|9\n");
                 break;
             }
