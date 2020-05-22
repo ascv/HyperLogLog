@@ -143,9 +143,9 @@ void flushRegisterBuffer(HyperLogLog* self)
             if (current->index == node->index) {
                 printf("|2");
                 if (current->fsb < node->fsb) {
-                    current->fsb = node->fsb;
                     self->histogram[(uint8_t)current->fsb]--;
                     self->histogram[(uint8_t)node->fsb]++;
+                    current->fsb = node->fsb;
                     printf("|3\n");
                 }
                 break;
