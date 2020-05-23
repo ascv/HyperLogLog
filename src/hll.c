@@ -146,10 +146,16 @@ void flushRegisterBuffer(HyperLogLog* self)
             printf("\tcreated head\n");
             self->histogram[0]--;
             self->histogram[(uint8_t)node->fsb]++;
+            prev = node;
             continue;
         }
 
-        current = self->sparseRegisterList;
+        if (prev != NULL) {
+            current = prev;
+        }
+        else {
+            current = self->sparseRegisterList;
+        }
 
         while (current != NULL) {
 
@@ -176,6 +182,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
                 self->sparseRegisterList = node;
+                prev = node;
                 break;
             }
 
@@ -185,6 +192,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
                 printf("|1\n");
+                prev = node;
                 break;
             }
 
@@ -195,6 +203,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
                 printf("|5\n");
+                prev = node;
                 break;
             }
 
