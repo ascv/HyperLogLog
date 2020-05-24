@@ -233,6 +233,17 @@ HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->histogram);
     free(self->registers);
+
+    if (self->isSparse) {
+        struct Node *next = NULL;
+        struct Node *current = self->sparseRegisterList;
+        while (current != NULL) {
+            next = current->next;
+            free(current);
+            current = next;
+        }
+    }
+
     Py_TYPE(self)->tp_free((PyObject*) self);
 }
 
@@ -306,29 +317,46 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
 
-    if (!self->isSparse) {
-        fsb = getReg(index, self->registers); /* Get the register by index */
-    }
-
     if (self->isSparse) {
-        setSparseReg(self, index, newFsb);
-        self->isCached = 0;
-    }
-
-    else if (newFsb > fsb) {
-        setReg(index, (uint8_t)newFsb, self->registers);
-        self->histogram[newFsb] += 1; /* Increment the new count */
-        self->isCached = 0;
-
-        if (self->histogram[fsb] > 0) {
-            self->histogram[fsb] -= 1; /* Decrement the old count */
+        //setSparseReg(self, index, newFsb);
+        if (self->sparseBufferSize < self->maxSparseBufferSize) {
+            struct Node* node = (struct Node*)malloc(sizeof(struct Node));
+            node->index = index;
+            node->fsb = newFsb;
+            self->sparseRegisterBuffer[self->sparseBufferSize] = *node;
+            self->sparseBufferSize++;
         }
 
         else {
-            self->histogram[0] += 1; /* Increment the zeroes count */
-        }
+            flushRegisterBuffer(self);
 
-        Py_RETURN_TRUE;
+            struct Node* node = (struct Node*)malloc(sizeof(struct Node));
+            self->sparseBufferSize = 1;
+            node->fsb = newFsb;
+            node->index = index;
+            self->sparseRegisterBuffer[0] = *node;
+        }
+        self->isCached = 0;
+    }
+
+    else {
+        fsb = getReg(index, self->registers); /* Get the register by index */
+
+        if (newFsb > fsb) {
+            setReg(index, (uint8_t)newFsb, self->registers);
+            self->histogram[newFsb] += 1; /* Increment the new count */
+            self->isCached = 0;
+
+            if (self->histogram[fsb] == 0) {
+                self->histogram[0] -= 1;
+            }
+
+            else {
+                self->histogram[fsb] -= 1;
+            }
+
+            Py_RETURN_TRUE;
+        }
     }
 
     Py_RETURN_FALSE;
