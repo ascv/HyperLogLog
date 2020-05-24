@@ -262,16 +262,6 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     }
 
     self->size = 1UL << self->p;
-    uint64_t bytes = (self->size*6)/8 + 1;
-    self->registers = (char *)calloc(bytes, sizeof(char));
-
-    if (self->registers == NULL) {
-        char* msg = (char*) malloc(128 * sizeof(char));
-        sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
-        PyErr_SetString(PyExc_MemoryError, msg);
-        return -1;
-    }
-
     self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
@@ -281,6 +271,17 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     if (sparse) {
         self->isSparse = 1;
         self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxSparseBufferSize);
+    }
+    else {
+        uint64_t bytes = (self->size*6)/8 + 1;
+        self->registers = (char *)calloc(bytes, sizeof(char));
+
+        if (self->registers == NULL) {
+            char* msg = (char*) malloc(128 * sizeof(char));
+            sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+            PyErr_SetString(PyExc_MemoryError, msg);
+            return -1;
+        }
     }
 
     return 0;
@@ -302,9 +303,12 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     hash = MurmurHash64A((void*)data, dataLen, self->seed);
 
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
-    fsb = getReg(index, self->registers); /* Pick a register */
     newFsb = hash << self->p; /* Remove the first p bits */
-    newFsb = clz(newFsb) + 1; /* Find the first set bit */
+    newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
+
+    if (!self->isSparse) {
+        fsb = getReg(index, self->registers); /* Get the register by index */
+    }
 
     if (self->isSparse) {
         setSparseReg(self, index, newFsb);
