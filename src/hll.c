@@ -25,10 +25,10 @@ typedef struct {
     struct Node* sparseRegisterList; /* Linked list of set registers */
     struct Node* nodeCache; /* Pointer to node accessed in the linked list */
     bool isSparse; /* If sparse encoding is currently in use */
-    uint64_t sparseRegisterCount; /* Number of elements in the linked list */
-    uint64_t bufferCount; /* Number of elements in the temporary buffer */
-    uint64_t maxBufferCount; /* Max number of elements for the temporary buffer */
-    struct Node* registerBuffer; /* Temporary buffer of nodes to be added */
+    uint64_t sparseRegisterSize; /* Number of elements in the linked list */
+    uint64_t sparseBufferSize; /* Number of elements in the temporary buffer */
+    uint64_t maxSparseBufferSize; /* Max number of elements for the temporary buffer */
+    struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
 } HyperLogLog;
 
 typedef struct Node {
@@ -128,14 +128,14 @@ void flushRegisterBuffer(HyperLogLog* self)
     struct Node *current = self->sparseRegisterList;
     struct Node *prev = NULL;
 
-    qsort(self->registerBuffer, self->bufferCount, sizeof(struct Node), nodeComp);
+    qsort(self->sparseRegisterBuffer, self->sparseBufferSize, sizeof(struct Node), nodeComp);
 
-    for (i = 0; i < self->bufferCount; i++) {
+    for (i = 0; i < self->sparseBufferSize; i++) {
 
         /* Create the new node from the element in the buffer */
         node = (struct Node*)malloc(sizeof(struct Node));
-        node->fsb = self->registerBuffer[i].fsb;
-        node->index = self->registerBuffer[i].index;
+        node->fsb = self->sparseRegisterBuffer[i].fsb;
+        node->index = self->sparseRegisterBuffer[i].index;
         node->next = NULL;
 
         /* If head doesn't exist then set it */
@@ -201,29 +201,29 @@ void flushRegisterBuffer(HyperLogLog* self)
         }
     }
 
-    self->bufferCount = 0;
+    self->sparseBufferSize = 0;
 }
 
 
 
 void setSparseReg(HyperLogLog* self, uint64_t index, char fsb) {
 
-    if (self->bufferCount < self->maxBufferCount) {
+    if (self->sparseBufferSize < self->maxSparseBufferSize) {
         struct Node* node = (struct Node*)malloc(sizeof(struct Node));
         node->index = index;
         node->fsb = fsb;
-        self->registerBuffer[self->bufferCount] = *node;
-        self->bufferCount++;
+        self->sparseRegisterBuffer[self->sparseBufferSize] = *node;
+        self->sparseBufferSize++;
     }
 
     else {
         flushRegisterBuffer(self);
 
         struct Node* node = (struct Node*)malloc(sizeof(struct Node));
-        self->bufferCount = 1;
+        self->sparseBufferSize = 1;
         node->fsb = fsb;
         node->index = index;
-        self->registerBuffer[0] = *node;
+        self->sparseRegisterBuffer[0] = *node;
     }
 }
 
@@ -261,6 +261,7 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
         return -1;
     }
 
+
     self->size = 1UL << self->p;
     uint64_t bytes = (self->size*6)/8 + 1;
     self->registers = (char *)calloc(bytes, sizeof(char));
@@ -277,7 +278,7 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->cache = 0;
     self->isCached = 0;
     self->isSparse = 0; //TODO: check for option to enable disable
-    self->maxBufferCount = 1024;
+    self->maxSparseBufferSize = 1024;
 
     if (self->seed == 100) {
         self->seed = 314;
@@ -285,7 +286,7 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     }
 
     if (self->isSparse) {
-        self->registerBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferCount);
+        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxSparseBufferSize);
     }
 
     return 0;
@@ -343,7 +344,7 @@ HyperLogLog_cardinality(HyperLogLog* self)
         return Py_BuildValue("K", self->cache);
     }
 
-    else if (self->isSparse && self->bufferCount > 0) {
+    else if (self->isSparse && self->sparseBufferSize > 0) {
         flushRegisterBuffer(self);
     }
 
