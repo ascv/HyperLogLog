@@ -247,11 +247,11 @@ HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
 static int
 HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 {
-    static char* kwlist[] = {"p", "seed"};
-    self->seed = 314;
+    static char* kwlist[] = {"p", "seed", "sparse"};
+    uint64_t sparse = 0;
+    self->seed = 314;  /* Chosen arbitrarily */
 
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "i|i", kwlist, &self->p, &self->seed)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwlist, &self->p, &self->seed, &sparse)) {
         return -1;
     }
 
@@ -260,7 +260,6 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
         PyErr_SetString(PyExc_ValueError, msg);
         return -1;
     }
-
 
     self->size = 1UL << self->p;
     uint64_t bytes = (self->size*6)/8 + 1;
@@ -277,15 +276,10 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
-    self->isSparse = 0; //TODO: check for option to enable disable
     self->maxSparseBufferSize = 1024;
 
-    if (self->seed == 100) {
-        self->seed = 314;
+    if (sparse) {
         self->isSparse = 1;
-    }
-
-    if (self->isSparse) {
         self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxSparseBufferSize);
     }
 
