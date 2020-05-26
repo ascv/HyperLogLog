@@ -260,8 +260,8 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
-    self->maxSparseBufferSize = 1024;
-    self->maxSparseListSize = 150000;
+    self->maxSparseBufferSize = 10000;
+    self->maxSparseListSize = 500000;
     self->sparseListSize = 0;
 
     if (sparse) {
@@ -305,21 +305,16 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     if (self->isSparse) {
 
         if (self->sparseBufferSize < self->maxSparseBufferSize) {
-            struct Node* node = (struct Node*)malloc(sizeof(struct Node));
-            node->index = index;
-            node->fsb = newFsb;
-            self->sparseRegisterBuffer[self->sparseBufferSize] = *node;
+            self->sparseRegisterBuffer[self->sparseBufferSize].index = index;
+            self->sparseRegisterBuffer[self->sparseBufferSize].fsb = newFsb;
             self->sparseBufferSize++;
         }
 
         else {
             flushRegisterBuffer(self);
-
-            struct Node* node = (struct Node*)malloc(sizeof(struct Node));
             self->sparseBufferSize = 1;
-            node->fsb = newFsb;
-            node->index = index;
-            self->sparseRegisterBuffer[0] = *node;
+            self->sparseRegisterBuffer[0].index = index;
+            self->sparseRegisterBuffer[0].fsb = newFsb;
         }
 
         if (self->sparseListSize >= self->maxSparseListSize) {
