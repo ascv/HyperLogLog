@@ -245,11 +245,13 @@ HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
 static int
 HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 {
-    static char* kwlist[] = {"p", "seed", "sparse"};
+    static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", NULL};
     uint64_t sparse = 0;
+    uint64_t maxSparseListSize = 0;
+
     self->seed = 314;  /* Chosen arbitrarily */
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwlist, &self->p, &self->seed, &sparse)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|iik", kwlist, &self->p, &self->seed, &sparse, &maxSparseListSize)) {
         return -1;
     }
 
@@ -264,13 +266,28 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
-    self->maxSparseBufferSize = 1000;
-    self->maxSparseListSize = 20000;
+    self->maxSparseBufferSize = 50000;
     self->sparseListSize = 0;
 
     if (sparse) {
         self->isSparse = 1;
         self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxSparseBufferSize);
+
+        if (maxSparseListSize > 0) {
+            self->maxSparseListSize = maxSparseListSize;
+        }
+        else {
+            uint64_t defaultSize = self->size/4;
+            uint64_t maxDefaultSize = 1 << 20;
+
+            if (maxDefaultSize < defaultSize) {
+                self->maxSparseListSize = maxDefaultSize;
+            }
+            else {
+                self->maxSparseListSize = defaultSize;
+            }
+        }
+        //printf("MAX SPARSE LIST SIZE: %lu\n", self->maxSparseListSize);
     }
     else {
         uint64_t bytes = (self->size*6)/8 + 1;
@@ -322,13 +339,14 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
         }
 
         if (self->sparseListSize >= self->maxSparseListSize) {
+            //printf("SWITCHING TO DENSE..\n");
 
             /* Allocate register memory */
             uint64_t bytes = (self->size*6)/8 + 1;
             self->registers = (char *)calloc(bytes, sizeof(char));
 
             if (self->registers == NULL) {
-                printf("FAILED TO ALLOCATE!\n");
+                //printf("FAILED TO ALLOCATE!\n");
             }
 
             struct Node *next = NULL;
