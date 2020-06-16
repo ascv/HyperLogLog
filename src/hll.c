@@ -25,10 +25,10 @@ typedef struct {
     struct Node* sparseRegisterList; /* Linked list of set registers */
     struct Node* nodeCache; /* Pointer to node accessed in the linked list */
     bool isSparse; /* If sparse encoding is currently in use */
-    uint64_t sparseListSize; /* Number of elements in the linked list */
-    uint64_t sparseBufferSize; /* Number of elements in the temporary buffer */
-    uint64_t maxSparseBufferSize; /* Max number of elements for the temporary buffer */
-    uint64_t maxSparseListSize; /* Max number of nodes in the sparse list */
+    uint64_t listSize; /* Number of elements in the linked list */
+    uint64_t bufferSize; /* Number of elements in the temporary buffer */
+    uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
+    uint64_t maxListSize; /* Max number of nodes in the sparse list */
     struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
 } HyperLogLog;
 
@@ -127,9 +127,9 @@ void flushRegisterBuffer(HyperLogLog* self)
     struct Node *next = NULL;
     struct Node *prev = NULL;
 
-    qsort(self->sparseRegisterBuffer, self->sparseBufferSize, sizeof(struct Node), nodeComp);
+    qsort(self->sparseRegisterBuffer, self->bufferSize, sizeof(struct Node), nodeComp);
 
-    for (i = 0; i < self->sparseBufferSize; i++) {
+    for (i = 0; i < self->bufferSize; i++) {
 
         /* Create the new node from the current element in the buffer */
         node = (struct Node*)malloc(sizeof(struct Node));
@@ -142,7 +142,7 @@ void flushRegisterBuffer(HyperLogLog* self)
             self->sparseRegisterList = node;
             self->histogram[0]--;
             self->histogram[(uint8_t)node->fsb]++;
-            self->sparseListSize += 1;
+            self->listSize += 1;
             prev = node;
             continue;
         }
@@ -178,7 +178,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
                 self->sparseRegisterList = node;
-                self->sparseListSize += 1;
+                self->listSize += 1;
                 prev = node;
                 break;
             }
@@ -188,7 +188,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 current->next = node;
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
-                self->sparseListSize += 1;
+                self->listSize += 1;
                 prev = node;
                 break;
             }
@@ -199,7 +199,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 current->next = node;
                 self->histogram[0]--;
                 self->histogram[(uint8_t)node->fsb]++;
-                self->sparseListSize += 1;
+                self->listSize += 1;
                 prev = node;
                 break;
             }
@@ -209,7 +209,7 @@ void flushRegisterBuffer(HyperLogLog* self)
         }
     }
 
-    self->sparseBufferSize = 0;
+    self->bufferSize = 0;
 }
 
 
@@ -267,44 +267,44 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->histogram[0] = self->size; /* Set the current zeroes count */
     self->cache = 0;
     self->isCached = 0;
-    self->sparseListSize = 0;
+    self->listSize = 0;
 
     if (sparse) {
         self->isSparse = 1;
 
         if (maxSparseListSize > 0) {
-            self->maxSparseListSize = maxSparseListSize;
+            self->maxListSize = maxSparseListSize;
         }
         else {
             uint64_t defaultSize = self->size/2;
             uint64_t maxDefaultSize = 1 << 20;
 
             if (maxDefaultSize < defaultSize) {
-                self->maxSparseListSize = maxDefaultSize;
+                self->maxListSize = maxDefaultSize;
             }
             else {
-                self->maxSparseListSize = defaultSize;
+                self->maxListSize = defaultSize;
             }
         }
-        //printf("MAX SPARSE LIST SIZE: %lu\n", self->maxSparseListSize);
+        //printf("MAX SPARSE LIST SIZE: %lu\n", self->maxListSize);
 
         if (maxSparseBufferSize > 0) {
-            self->maxSparseBufferSize = maxSparseBufferSize;
+            self->maxBufferSize = maxSparseBufferSize;
         }
         else {
-            uint64_t defaultSize = self->maxSparseListSize/2;
+            uint64_t defaultSize = self->maxListSize/2;
             uint64_t maxDefaultSize = 200000;
 
             if (maxDefaultSize < defaultSize) {
-                self->maxSparseBufferSize = maxDefaultSize;
+                self->maxBufferSize = maxDefaultSize;
             }
             else {
-                self->maxSparseBufferSize = defaultSize;
+                self->maxBufferSize = defaultSize;
             }
         }
 
-        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxSparseBufferSize);
-        //printf("MAX SPARSE BUFFER SIZE: %lu\n", self->maxSparseBufferSize);
+        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferSize);
+        //printf("MAX SPARSE BUFFER SIZE: %lu\n", self->maxBufferSize);
 
     }
     else {
@@ -343,20 +343,20 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
 
     if (self->isSparse) {
 
-        if (self->sparseBufferSize < self->maxSparseBufferSize) {
-            self->sparseRegisterBuffer[self->sparseBufferSize].index = index;
-            self->sparseRegisterBuffer[self->sparseBufferSize].fsb = newFsb;
-            self->sparseBufferSize++;
+        if (self->bufferSize < self->maxBufferSize) {
+            self->sparseRegisterBuffer[self->bufferSize].index = index;
+            self->sparseRegisterBuffer[self->bufferSize].fsb = newFsb;
+            self->bufferSize++;
         }
 
         else {
             flushRegisterBuffer(self);
-            self->sparseBufferSize = 1;
+            self->bufferSize = 1;
             self->sparseRegisterBuffer[0].index = index;
             self->sparseRegisterBuffer[0].fsb = newFsb;
         }
 
-        if (self->sparseListSize >= self->maxSparseListSize) {
+        if (self->listSize >= self->maxListSize) {
             //printf("SWITCHING TO DENSE..\n");
 
             /* Allocate register memory */
@@ -423,7 +423,7 @@ HyperLogLog_cardinality(HyperLogLog* self)
         return Py_BuildValue("K", self->cache);
     }
 
-    else if (self->isSparse && self->sparseBufferSize > 0) {
+    else if (self->isSparse && self->bufferSize > 0) {
         flushRegisterBuffer(self);
     }
 
