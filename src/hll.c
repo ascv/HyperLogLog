@@ -455,6 +455,28 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
     if (!PyArg_ParseTuple(args, "k", &index)) return NULL;
     if (!isValidIndex(index, self->size)) return NULL;
 
+    if (self->isSparse) {
+        struct Node *current = NULL;
+        struct Node *next = NULL;
+
+        current = self->sparseRegisterList;
+        while (current != NULL) {
+
+            if (current->index > index) {
+                return Py_BuildValue("k", 0);
+            }
+
+            else if (current->index == index) {
+                return Py_BuildValue("k", current->fsb);
+            }
+
+            next = current;
+            current = current->next;
+        }
+
+        return Py_BuildValue("k", 0);
+    }
+
     return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
 }
 
