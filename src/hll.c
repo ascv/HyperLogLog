@@ -446,7 +446,7 @@ HyperLogLog_cardinality(HyperLogLog* self)
     return Py_BuildValue("K", estimate);
 }
 
-/* Gets the the Murmur hash seed. */
+/* Gets the Murmur hash seed. */
 static PyObject*
 HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 {
@@ -457,7 +457,6 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 
     if (self->isSparse) {
         struct Node *current = NULL;
-        struct Node *next = NULL;
 
         current = self->sparseRegisterList;
         while (current != NULL) {
@@ -470,7 +469,6 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
                 return Py_BuildValue("k", current->fsb);
             }
 
-            next = current;
             current = current->next;
         }
 
@@ -478,6 +476,19 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
     }
 
     return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
+}
+
+/* Gets a dictionary of internal attributes and their values */
+static PyObject*
+HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
+{
+    return Py_BuildValue("{s:k,s:k,s:k,s:i,s:i}",
+        "list_size", self->listSize,
+        "buffer_size", self->bufferSize,
+        "cache", self->cache,
+        "is_cached", self->isCached,
+        "is_sparse", self->isSparse
+    );
 }
 
 /* Get a Murmur64A hash of a string, buffer or bytes object. */
@@ -633,23 +644,26 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
      "Get a MurmurHash64A hash."
     },
-    {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
-     "Get a histogram of the register values."
+    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
+     "Get the hash function seed."
     },
-    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
-     "Serialization helper function for pickling."
+    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
+     "Get the number of registers."
     },
     {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
      "Get the value of a register."
     },
-    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
-     "Get the hash function seed."
+    {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
+     "Get a histogram of the register values."
+    },
+    {"_get_meta", (PyCFunction)HyperLogLog__get_meta, METH_NOARGS,
+     "Get the values of internal attributes."
+    },
+    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
+     "Serialization helper function for pickling."
     },
     {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS,
     "De-serialization helper function for pickling."
-    },
-    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
-     "Get the number of registers."
     },
     {NULL}  /* Sentinel */
 };
