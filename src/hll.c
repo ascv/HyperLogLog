@@ -20,14 +20,14 @@ typedef struct {
     uint64_t cache; /* Cached cardinality estimate */
     uint64_t adds; /* Number of elements added */
     bool isCached; /* If the cache is up to date */
+    bool isSparse; /* If sparse encoding is currently in use */
 
-    /* Used for sparse encoding */
+    /* Sparse encoding fields */
     struct Node* sparseRegisterList; /* Linked list of set registers */
     struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
-    struct Node* nodeCache; /* Pointer to node accessed in the linked list */
-    bool isSparse; /* If sparse encoding is currently in use */
-    uint64_t listSize; /* Number of elements in the linked list */
+    struct Node* nodeCache; /* The last register accessed via _get() */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
+    uint64_t listSize; /* Number of elements in the linked list */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
     uint64_t maxListSize; /* Max number of nodes in the sparse list */
 } HyperLogLog;
@@ -450,7 +450,7 @@ HyperLogLog_cardinality(HyperLogLog* self)
     return Py_BuildValue("K", estimate);
 }
 
-/* Gets the Murmur hash seed. */
+/* Gets the a register value by index */
 static PyObject*
 HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 {
@@ -463,6 +463,12 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
         struct Node *current = NULL;
 
         current = self->sparseRegisterList;
+
+        /* Can we used the cache? */
+        if (self->nodeCache != NULL && self->nodeCache->index <= index) {
+            current = self->nodeCache;
+        }
+
         while (current != NULL) {
 
             if (current->index > index) {
@@ -470,6 +476,7 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
             }
 
             else if (current->index == index) {
+                self->nodeCache = current;
                 return Py_BuildValue("k", current->fsb);
             }
 
