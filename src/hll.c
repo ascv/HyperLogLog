@@ -18,18 +18,18 @@ typedef struct {
     uint64_t seed; /* MurmurHash64A seed */
     uint64_t size; /* Number of registers */
     uint64_t cache; /* Cached cardinality estimate */
-    uint64_t count; /* Number of elements added */
+    uint64_t adds; /* Number of elements added */
     bool isCached; /* If the cache is up to date */
 
     /* Used for sparse encoding */
     struct Node* sparseRegisterList; /* Linked list of set registers */
+    struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
     struct Node* nodeCache; /* Pointer to node accessed in the linked list */
     bool isSparse; /* If sparse encoding is currently in use */
     uint64_t listSize; /* Number of elements in the linked list */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
     uint64_t maxListSize; /* Max number of nodes in the sparse list */
-    struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
 } HyperLogLog;
 
 typedef struct Node {
@@ -264,7 +264,9 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 
     self->size = 1UL << self->p;
     self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
-    self->histogram[0] = self->size; /* Set the current zeroes count */
+    self->histogram[0] = self->size; /* Set the zeroes count */
+
+    self->adds = 0;
     self->cache = 0;
     self->isCached = 0;
     self->listSize = 0;
@@ -340,6 +342,8 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
+
+    self->adds++;
 
     if (self->isSparse) {
 
@@ -482,7 +486,8 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 static PyObject*
 HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 {
-    return Py_BuildValue("{s:k,s:k,s:k,s:i,s:i}",
+    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i}",
+        "adds", self->adds,
         "list_size", self->listSize,
         "buffer_size", self->bufferSize,
         "cache", self->cache,
