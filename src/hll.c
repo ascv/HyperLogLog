@@ -371,17 +371,18 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
-
-    self->adds++;
+    self->adds++; /* Increment method call counter */
 
     if (self->isSparse) {
 
+        /* Add an element to the buffer if there is room */
         if (self->bufferSize < self->maxBufferSize) {
             self->sparseRegisterBuffer[self->bufferSize].index = index;
             self->sparseRegisterBuffer[self->bufferSize].fsb = newFsb;
             self->bufferSize++;
         }
 
+        /* Otherwise flush the buffer and then add */
         else {
             flushRegisterBuffer(self);
             self->bufferSize = 1;
@@ -389,36 +390,48 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
             self->sparseRegisterBuffer[0].fsb = newFsb;
         }
 
+        /* Switch to dense representation? */
         if (self->listSize >= self->maxListSize) {
-            //printf("SWITCHING TO DENSE..\n");
 
-            /* Allocate register memory */
+            /* Allocate memory for the registers */
             uint64_t bytes = (self->size*6)/8 + 1;
             self->registers = (char *)calloc(bytes, sizeof(char));
 
             if (self->registers == NULL) {
-                printf("FAILED TO ALLOCATE!\n");
+                char* msg = (char*) malloc(128 * sizeof(char));
+                sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+                PyErr_SetString(PyExc_MemoryError, msg);
+                Py_RETURN_FALSE;
             }
+
+            /* Empty out the buffer */
+            flushRegisterBuffer(self);
 
             struct Node *next = NULL;
             struct Node *current = self->sparseRegisterList;
 
-            // Set dense registers
+            /* Set dense registers */
             while (current != NULL) {
                 setReg(current->index, (uint8_t)current->fsb, self->registers);
                 next = current->next;
                 current = next;
             }
 
-            // Free sparse registers
             current = self->sparseRegisterList;
+
+            /* De-allocate the linked list */
             while (current != NULL) {
                 next = current;
                 current = current->next;
                 free(next);
             }
 
+            /* De-allocate the temporary buffer */
             free(self->sparseRegisterBuffer);
+
+            /* Clear out the _get() cache */
+            free(self->nodeCache);
+
             self->isSparse = 0;
         }
 
