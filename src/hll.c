@@ -41,18 +41,17 @@ typedef struct Node {
 
 /* ========================== Sparse encoding ============================== */
 /*
- * When there aren't very many registers set it is inefficient to keep all the
- * registers in memory since most of them are zero. Instead we store only the
- * registers with a positive value in a sorted linked list. For example,
- * consider the registers below stored in an array:
+ * When most of the registers are zero it is inefficient to store them
+ * individually in memory. Instead, we use a sparse representation of the
+ * registers where only non-zero registers are stored. This registers are
+ * stored in a linked list. For example,
  *
- *      0 1 2 3 4 5 6 7  <-- indices
  *     +-+-+-+-+-+-+-+-+
- *     |0|3|0|0|1|1|0|2| <-- values
+ *     |0|3|0|0|1|1|0|2|
  *     +-+-+-+-+-+-+-+-+
  *
  * If these registers were sparsely encoded then we would have the following
- * linked list:
+ * linked list of indices and their values:
  *
  *            index
  *              |
@@ -72,6 +71,36 @@ typedef struct Node {
  * both the buffer and list are sorted we can iterate over both lists together
  * in one pass.
  */
+
+static PyObject*
+getSparseRegister(HyperLogLog* self, uint64_t index)
+{
+    struct Node *current = NULL;
+
+    current = self->sparseRegisterList;
+
+    /* Can we used the cache? */
+    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
+        current = self->nodeCache;
+    }
+
+    while (current != NULL) {
+
+        if (current->index > index) {
+            return Py_BuildValue("k", 0);
+        }
+
+        else if (current->index == index) {
+            self->nodeCache = current;
+            return Py_BuildValue("k", current->fsb);
+        }
+
+        current = current->next;
+    }
+
+    return Py_BuildValue("k", 0);
+}
+
 void printSparseRegisters(HyperLogLog* self)
 {
     struct Node *next = NULL;
@@ -460,30 +489,7 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
     if (!isValidIndex(index, self->size)) return NULL;
 
     if (self->isSparse) {
-        struct Node *current = NULL;
-
-        current = self->sparseRegisterList;
-
-        /* Can we used the cache? */
-        if (self->nodeCache != NULL && self->nodeCache->index <= index) {
-            current = self->nodeCache;
-        }
-
-        while (current != NULL) {
-
-            if (current->index > index) {
-                return Py_BuildValue("k", 0);
-            }
-
-            else if (current->index == index) {
-                self->nodeCache = current;
-                return Py_BuildValue("k", current->fsb);
-            }
-
-            current = current->next;
-        }
-
-        return Py_BuildValue("k", 0);
+        return getSparseRegister(self, index);
     }
 
     return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
