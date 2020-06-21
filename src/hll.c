@@ -18,14 +18,14 @@ typedef struct {
     uint64_t seed; /* MurmurHash64A seed */
     uint64_t size; /* Number of registers */
     uint64_t cache; /* Cached cardinality estimate */
-    uint64_t adds; /* Number of elements added */
+    uint64_t added; /* Number of elements added */
     bool isCached; /* If the cache is up to date */
     bool isSparse; /* If sparse encoding is currently in use */
 
-    /* Sparse encoding fields */
+    /* Fields used for sparse representation */
     struct Node* sparseRegisterList; /* Linked list of set registers */
     struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
-    struct Node* nodeCache; /* The last register accessed via _get() */
+    struct Node* nodeCache; /* The last sparse register accessed using _get() */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
     uint64_t listSize; /* Number of elements in the linked list */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
@@ -39,760 +39,10 @@ typedef struct Node {
 } Node;
 
 
-/* ========================== Sparse encoding ============================== */
+/* ========================== Dense representation ========================= */
 /*
- * When most of the registers are zero it is inefficient to store them
- * individually in memory. Instead, we use a sparse representation of the
- * registers where only non-zero registers are stored. This registers are
- * stored in a linked list. For example,
- *
- *     +-+-+-+-+-+-+-+-+
- *     |0|3|0|0|1|1|0|2|
- *     +-+-+-+-+-+-+-+-+
- *
- * If these registers were sparsely encoded then we would have the following
- * linked list of indices and their values:
- *
- *            index
- *              |
- *              v
- *     +---+   +---+   +---+   +---+
- *     |1,3|-->|4,1|-->|5,1|-->|7,2|
- *     +---+   +---+   +---+   +---+
- *                ^
- *                |
- *              value
- *
- * Note that the registers are sorted by index. To avoid the expense of
- * traversing the list each time an element is added to the HyperLogLog we
- * instead keep a temporary buffer of elements. Added elements are first
- * put into the buffer. When the buffer is full or cardinality() is called
- * then the elements in the buffer are sorted and added to the list. Since
- * both the buffer and list are sorted we can iterate over both lists together
- * in one pass.
- */
-
-static PyObject*
-getSparseRegister(HyperLogLog* self, uint64_t index)
-{
-    struct Node *current = NULL;
-
-    current = self->sparseRegisterList;
-
-    /* Can we used the cache? */
-    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
-        current = self->nodeCache;
-    }
-
-    while (current != NULL) {
-
-        if (current->index > index) {
-            return Py_BuildValue("k", 0);
-        }
-
-        else if (current->index == index) {
-            self->nodeCache = current;
-            return Py_BuildValue("k", current->fsb);
-        }
-
-        current = current->next;
-    }
-
-    return Py_BuildValue("k", 0);
-}
-
-void printSparseRegisters(HyperLogLog* self)
-{
-    struct Node *next = NULL;
-    struct Node *current = self->sparseRegisterList;
-    int i = 0;
-    int max = 0;
-
-    while (current != NULL) {
-        next = current->next;
-        current = next;
-        i++;
-
-        if ((max > 0) && (i >= max)) {
-            return;
-        }
-    }
-}
-
-int nodeComp(const void* a, const void* b) {
-    struct Node* A = (struct Node*) a;
-    struct Node* B = (struct Node*) b;
-
-    int result = -1;
-
-    if (A->index == B->index) {
-        if (A->fsb > B->fsb) {
-            result = 1;
-        }
-        else if (A->fsb < B->fsb) {
-            result = -1;
-        }
-        else {
-            result = 0;
-        }
-    }
-
-    else if (A->index > B->index) {
-        result = 1;
-    }
-
-    return result;
-}
-
-/* Clears the temporary buffer of registers and tries to add them to the
- * linked list of registers.
- */
-void flushRegisterBuffer(HyperLogLog* self)
-{
-    uint64_t i;
-
-    struct Node* node;
-    struct Node *current = self->sparseRegisterList;
-    struct Node *next = NULL;
-    struct Node *prev = NULL;
-
-    qsort(self->sparseRegisterBuffer, self->bufferSize, sizeof(struct Node), nodeComp);
-
-    for (i = 0; i < self->bufferSize; i++) {
-
-        /* Create the new node from the current element in the buffer */
-        node = (struct Node*)malloc(sizeof(struct Node));
-        node->fsb = self->sparseRegisterBuffer[i].fsb;
-        node->index = self->sparseRegisterBuffer[i].index;
-        node->next = NULL;
-
-        /* If head doesn't exist then set it */
-        if (self->sparseRegisterList == NULL) {
-            self->sparseRegisterList = node;
-            self->histogram[0]--;
-            self->histogram[(uint8_t)node->fsb]++;
-            self->listSize += 1;
-            prev = node;
-            continue;
-        }
-
-        /* Try to use the last node */
-        if (prev != NULL) {
-            current = prev;
-        }
-        else {
-            current = self->sparseRegisterList;
-        }
-
-        while (current != NULL) {
-
-            // Are we updating an existing node?
-            if (current->index == node->index) {
-                if (current->fsb < node->fsb) {
-                    self->histogram[(uint8_t)current->fsb]--;
-                    self->histogram[(uint8_t)node->fsb]++;
-                    current->fsb = node->fsb;
-                }
-                prev = current;
-
-                /* Since we are updating an existing node, we can free the new node */
-                free(node);
-
-                break;
-            }
-
-            // Are we the new head?
-            if (current->index > node->index) {
-                node->next = current;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->sparseRegisterList = node;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            // Are we the tail?
-            if (current->next == NULL) {
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            // Are we between nodes?
-            if (current->next->index > node->index) {
-                node->next = current->next;
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            next = current->next;
-            current = next;
-        }
-    }
-
-    self->bufferSize = 0;
-}
-
-
-static void
-HyperLogLog_dealloc(HyperLogLog* self)
-{
-    free(self->histogram);
-    free(self->registers);
-
-    if (self->isSparse) {
-        struct Node *next = NULL;
-        struct Node *current = self->sparseRegisterList;
-        while (current != NULL) {
-            next = current->next;
-            free(current);
-            current = next;
-        }
-
-        free(self->sparseRegisterBuffer);
-    }
-
-    Py_TYPE(self)->tp_free((PyObject*) self);
-}
-
-static PyObject*
-HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
-{
-    HyperLogLog* self;
-    self = (HyperLogLog*)type->tp_alloc(type, 0);
-    return (PyObject*)self;
-}
-
-static int
-HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
-{
-    static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", "max_sparse_buffer_size", NULL};
-    uint64_t sparse = 0;
-    uint64_t maxSparseListSize = 0;
-    uint64_t maxSparseBufferSize = 0;
-
-    self->seed = 314;  /* Chosen arbitrarily */
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|iikk", kwlist, &self->p, &self->seed, &sparse, &maxSparseListSize, &maxSparseBufferSize)) {
-        return -1;
-    }
-
-    if (self->p < 2 || self->p > 63) {
-        char* msg = "p is out of range";
-        PyErr_SetString(PyExc_ValueError, msg);
-        return -1;
-    }
-
-    self->size = 1UL << self->p;
-    self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
-    self->histogram[0] = self->size; /* Set the zeroes count */
-
-    self->adds = 0;
-    self->cache = 0;
-    self->isCached = 0;
-    self->listSize = 0;
-
-    if (sparse) {
-        self->isSparse = 1;
-
-        if (maxSparseListSize > 0) {
-            self->maxListSize = maxSparseListSize;
-        }
-        else {
-            uint64_t defaultSize = self->size/2;
-            uint64_t maxDefaultSize = 1 << 20;
-
-            if (maxDefaultSize < defaultSize) {
-                self->maxListSize = maxDefaultSize;
-            }
-            else {
-                self->maxListSize = defaultSize;
-            }
-        }
-        //printf("MAX SPARSE LIST SIZE: %lu\n", self->maxListSize);
-
-        if (maxSparseBufferSize > 0) {
-            self->maxBufferSize = maxSparseBufferSize;
-        }
-        else {
-            uint64_t defaultSize = self->maxListSize/2;
-            uint64_t maxDefaultSize = 200000;
-
-            if (maxDefaultSize < defaultSize) {
-                self->maxBufferSize = maxDefaultSize;
-            }
-            else {
-                self->maxBufferSize = defaultSize;
-            }
-        }
-
-        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferSize);
-        //printf("MAX SPARSE BUFFER SIZE: %lu\n", self->maxBufferSize);
-
-    }
-    else {
-        uint64_t bytes = (self->size*6)/8 + 1;
-        self->registers = (char *)calloc(bytes, sizeof(char));
-
-        if (self->registers == NULL) {
-            char* msg = (char*) malloc(128 * sizeof(char));
-            sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
-            PyErr_SetString(PyExc_MemoryError, msg);
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static PyMemberDef HyperLogLog_members[] = {
-    {NULL} /* Sentinel */
-};
-
-/* Add an element. */
-static PyObject*
-HyperLogLog_add(HyperLogLog* self, PyObject* args)
-{
-    const char* data;
-    const uint64_t dataLen;
-    uint64_t hash, index, fsb, newFsb;
-
-    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
-    hash = MurmurHash64A((void*)data, dataLen, self->seed);
-
-    index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
-    newFsb = hash << self->p; /* Remove the first p bits */
-    newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
-    self->adds++; /* Increment method call counter */
-
-    if (self->isSparse) {
-
-        /* Add an element to the buffer if there is room */
-        if (self->bufferSize < self->maxBufferSize) {
-            self->sparseRegisterBuffer[self->bufferSize].index = index;
-            self->sparseRegisterBuffer[self->bufferSize].fsb = newFsb;
-            self->bufferSize++;
-        }
-
-        /* Otherwise flush the buffer and then add */
-        else {
-            flushRegisterBuffer(self);
-            self->bufferSize = 1;
-            self->sparseRegisterBuffer[0].index = index;
-            self->sparseRegisterBuffer[0].fsb = newFsb;
-        }
-
-        /* Switch to dense representation? */
-        if (self->listSize >= self->maxListSize) {
-
-            /* Allocate memory for the registers */
-            uint64_t bytes = (self->size*6)/8 + 1;
-            self->registers = (char *)calloc(bytes, sizeof(char));
-
-            if (self->registers == NULL) {
-                char* msg = (char*) malloc(128 * sizeof(char));
-                sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
-                PyErr_SetString(PyExc_MemoryError, msg);
-                Py_RETURN_FALSE;
-            }
-
-            /* Empty out the buffer */
-            flushRegisterBuffer(self);
-
-            struct Node *next = NULL;
-            struct Node *current = self->sparseRegisterList;
-
-            /* Set dense registers */
-            while (current != NULL) {
-                setReg(current->index, (uint8_t)current->fsb, self->registers);
-                next = current->next;
-                current = next;
-            }
-
-            current = self->sparseRegisterList;
-
-            /* De-allocate the linked list */
-            while (current != NULL) {
-                next = current;
-                current = current->next;
-                free(next);
-            }
-
-            /* De-allocate the temporary buffer */
-            free(self->sparseRegisterBuffer);
-
-            /* Clear out the _get() cache */
-            free(self->nodeCache);
-
-            self->isSparse = 0;
-        }
-
-        self->isCached = 0;
-    }
-
-    else {
-        fsb = getReg(index, self->registers); /* Get the register by index */
-
-        if (newFsb > fsb) {
-            setReg(index, (uint8_t)newFsb, self->registers);
-            self->histogram[newFsb] += 1; /* Increment the new count */
-            self->isCached = 0;
-
-            if (self->histogram[fsb] == 0) {
-                self->histogram[0] -= 1;
-            }
-
-            else {
-                self->histogram[fsb] -= 1;
-            }
-
-            Py_RETURN_TRUE;
-        }
-    }
-
-    Py_RETURN_FALSE;
-};
-
-/* Get a cardinality estimate */
-static PyObject*
-HyperLogLog_cardinality(HyperLogLog* self)
-{
-    if (self->isCached) {
-        return Py_BuildValue("K", self->cache);
-    }
-
-    else if (self->isSparse && self->bufferSize > 0) {
-        flushRegisterBuffer(self);
-    }
-
-    double alpha = 0.7213475;
-    double m = (double)self->size;
-    double z = m*tau((m - (double)self->histogram[self->p + 1])/m);
-
-    uint64_t k;
-    for (k = 64 - self->p; k >= 1; --k) {
-        z += self->histogram[k];
-        z *= 0.5;
-    }
-
-    z += m*sigma((double)self->histogram[0]/m);
-    uint64_t estimate = (uint64_t) round(alpha*m*(m/z));
-
-    self->cache = estimate;
-    self->isCached = 1;
-
-    return Py_BuildValue("K", estimate);
-}
-
-/* Gets the a register value by index */
-static PyObject*
-HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
-{
-    unsigned long index;
-
-    if (!PyArg_ParseTuple(args, "k", &index)) return NULL;
-    if (!isValidIndex(index, self->size)) return NULL;
-
-    if (self->isSparse) {
-        return getSparseRegister(self, index);
-    }
-
-    return Py_BuildValue("k", getReg((uint8_t)index, self->registers));
-}
-
-/* Gets a dictionary of internal attributes and their values */
-static PyObject*
-HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
-{
-    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i}",
-        "adds", self->adds,
-        "list_size", self->listSize,
-        "buffer_size", self->bufferSize,
-        "cache", self->cache,
-        "is_cached", self->isCached,
-        "is_sparse", self->isSparse
-    );
-}
-
-/* Get a Murmur64A hash of a string, buffer or bytes object. */
-static PyObject*
-HyperLogLog_hash(HyperLogLog* self, PyObject* args)
-{
-    const char* data;
-    const uint64_t dataLen;
-
-    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
-
-    uint64_t hash = MurmurHash64A((void*) data, dataLen, self->seed);
-    return Py_BuildValue("K", hash);
-}
-
-/* Gets a histogram of first set bit positions as a list of ints. */
-static PyObject*
-HyperLogLog__histogram(HyperLogLog* self)
-{
-    PyObject* histogram = PyList_New(65);
-
-    for (int i = 0; i < 65; i++)
-    {
-        PyObject* count = Py_BuildValue("i", self->histogram[i]);
-        PyList_SetItem(histogram, i, count);
-    }
-    return histogram;
-}
-
-/* Merges another HyperLogLog into the current HyperLogLog. The registers of
- * the other HyperLogLog are unaffected. */
-static PyObject*
-HyperLogLog_merge(HyperLogLog* self, PyObject* args)
-{
-    PyObject* hll;
-    uint64_t hllSize;
-
-    if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
-
-    PyObject* size = PyObject_CallMethod(hll, "size", NULL);
-
-    #if PY_MAJOR_VERSION >= 3
-        hllSize = PyLong_AsLong(size);
-    #else
-        hllSize = PyInt_AS_LONG(size);
-    #endif
-
-    if (hllSize > self->size) {
-        PyErr_SetString(PyExc_ValueError, "Unequal sizes");
-        return NULL;
-    }
-
-    Py_DECREF(size);
-    self->isCached = 0;
-
-    for (uint64_t i = 0; i < self->size; i++) {
-        PyObject* newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
-        unsigned long newVal = PyLong_AsUnsignedLong(newReg);
-        uint64_t oldVal = getReg(i, self->registers);
-
-        if (oldVal < newVal) {
-            setReg(i, newVal, self->registers);
-            self->histogram[newVal] += 1; /* Increment new count */
-
-            if (self->histogram[oldVal] > 0) {
-                self->histogram[oldVal] -= 1; /* Decrement old count */
-            }
-
-            else {
-                self->histogram[0] += 1; /* Increment zeroes count */
-            }
-        }
-
-        Py_DECREF(newReg);
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
-HyperLogLog_reduce(HyperLogLog* self)
-{
-    PyObject* val;
-    PyObject* state = PyList_New(self->size + 65);
-
-    for (int i = 0; i < 65; i++) {
-        val = Py_BuildValue("k", self->histogram[i]);
-        PyList_SetItem(state, i, val);
-    }
-
-    for (uint64_t i = 65; i < self->size + 65; i++)
-    {
-        val = Py_BuildValue("k", getReg(i - 65, self->registers));
-        PyList_SetItem(state, i, val);
-    }
-
-    PyObject* args = Py_BuildValue("(ii)", self->p, self->seed);
-    return Py_BuildValue("(ONN)", Py_TYPE(self), args, state);
-}
-
-/* Gets the seed value used in the Murmur hash. */
-static PyObject*
-HyperLogLog_seed(HyperLogLog* self)
-{
-    return Py_BuildValue("k", self->seed);
-}
-
-static PyObject*
-HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
-{
-
-    PyObject* dump;
-    PyObject* valPtr;
-    unsigned long val;
-
-    if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
-
-    for (int i = 0; i < 65; i++) {
-        valPtr = PyList_GetItem(dump, i);
-        val = PyLong_AsUnsignedLong(valPtr);
-        self->histogram[i] = val;
-    }
-
-    for (uint64_t i = 65; i < self->size + 65; i++)
-    {
-        valPtr = PyList_GetItem(dump, i);
-        val = PyLong_AsUnsignedLong(valPtr);
-        setReg(i-63, (uint8_t)val, self->registers);
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-/* Gets the number of registers. */
-static PyObject*
-HyperLogLog_size(HyperLogLog* self)
-{
-    return Py_BuildValue("i", self->size);
-}
-
-static PyMethodDef HyperLogLog_methods[] = {
-    {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
-     "Add an element."
-    },
-    {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
-     "Get the cardinality."
-    },
-    {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
-     "Merge another HyperLogLog."
-    },
-    {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
-     "Get a MurmurHash64A hash."
-    },
-    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
-     "Get the hash function seed."
-    },
-    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
-     "Get the number of registers."
-    },
-    {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
-     "Get the value of a register."
-    },
-    {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
-     "Get a histogram of the register values."
-    },
-    {"_get_meta", (PyCFunction)HyperLogLog__get_meta, METH_NOARGS,
-     "Get the values of internal attributes."
-    },
-    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
-     "Serialization helper function for pickling."
-    },
-    {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS,
-    "De-serialization helper function for pickling."
-    },
-    {NULL}  /* Sentinel */
-};
-
-static PyTypeObject HyperLogLogType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "HLL.HyperLogLog",               /* tp_name */
-    sizeof(HyperLogLog),             /* tp_basicsize */
-    0,                               /* tp_itemsize */
-    (destructor)HyperLogLog_dealloc, /* tp_dealloc */
-    0,                               /* tp_print */
-    0,                               /* tp_getattr */
-    0,                               /* tp_setattr */
-    0,                               /* tp_compare */
-    0,                               /* tp_repr */
-    0,                               /* tp_as_number */
-    0,                               /* tp_as_sequence */
-    0,                               /* tp_as_mapping */
-    0,                               /* tp_hash */
-    0,                               /* tp_call */
-    0,                               /* tp_str */
-    0,                               /* tp_getattro */
-    0,                               /* tp_setattro */
-    0,                               /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT |
-        Py_TPFLAGS_BASETYPE,         /* tp_flags */
-    "HyperLogLog object",            /* tp_doc */
-    0,                               /* tp_traverse */
-    0,                               /* tp_clear */
-    0,                               /* tp_richcompare */
-    0,                               /* tp_weaklistoffset */
-    0,                               /* tp_iter */
-    0,                               /* tp_iternext */
-    HyperLogLog_methods,             /* tp_methods */
-    HyperLogLog_members,             /* tp_members */
-    0,                               /* tp_getset */
-    0,                               /* tp_base */
-    0,                               /* tp_dict */
-    0,                               /* tp_descr_get */
-    0,                               /* tp_descr_set */
-    0,                               /* tp_dictoffset */
-    (initproc)HyperLogLog_init,      /* tp_init */
-    0,                               /* tp_alloc */
-    HyperLogLog_new,                 /* tp_new */
-};
-
-#if PY_MAJOR_VERSION >= 3
-    static PyModuleDef HyperLogLogmodule = {
-        PyModuleDef_HEAD_INIT,
-        "HyperLogLog",
-        "A space efficient cardinality estimator.",
-        -1,
-        NULL, NULL, NULL, NULL, NULL
-    };
-#else
-    static PyMethodDef module_methods[] = {
-        {NULL}  /* Sentinel */
-    };
-#endif
-
-#if PY_MAJOR_VERSION >=3
-    PyMODINIT_FUNC
-    PyInit_HLL(void)
-#else
-    /* declarations for DLL import or export */
-    #ifndef PyMODINIT_FUNC
-        #define PyMODINIT_FUNC void
-    #endif
-    PyMODINIT_FUNC initHLL(void)
-#endif
-
-{
-    PyObject* m;
-    #if PY_MAJOR_VERSION >= 3
-        if (PyType_Ready(&HyperLogLogType) < 0) return NULL;
-        m = PyModule_Create(&HyperLogLogmodule);
-        if (m == NULL) return NULL;
-    #else
-        if (PyType_Ready(&HyperLogLogType) < 0) return;
-        char* info = "HyperLogLog cardinality estimator.";
-        m = Py_InitModule3("HLL", module_methods, info);
-        if (m == NULL) return;
-    #endif
-
-    Py_INCREF(&HyperLogLogType);
-    PyModule_AddObject(m, "HyperLogLog", (PyObject*)&HyperLogLogType);
-
-    #if PY_MAJOR_VERSION >= 3
-        return m;
-    #endif
-}
-
-
-/* ========================== Dense encoding ==============================
- *
- * The value of a register will never exceed 64 so using a byte to store the
- * value is wasteful. Instead each register uses 6 bits of memory:
- *
+ * Since register values will never exceed 64 we can store them using only
+ * 6 bits. This encoding is diagrammed below:
  *
  *          b0        b1        b3        b4
  *          /         /         /         /
@@ -963,8 +213,9 @@ static PyTypeObject HyperLogLogType = {
  *       m2 = "000111"
  */
 
+
 /* Get register m. */
-static inline uint64_t getReg(uint64_t m, char* regs)
+static inline uint64_t getDenseRegister(uint64_t m, char* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -981,8 +232,9 @@ static inline uint64_t getReg(uint64_t m, char* regs)
     return (uint64_t) reg;
 }
 
+
 /* Set register m to n. */
-static inline void setReg(uint64_t m, uint8_t n, char* regs)
+static inline void setDenseRegister(uint64_t m, uint8_t n, char* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -1002,6 +254,738 @@ static inline void setReg(uint64_t m, uint8_t n, char* regs)
 }
 
 
+/* ========================== Sparse representation ======================== */
+/*
+ * When a HyperLogLog is created its register values are initialized to zero.
+ * Because the registers share the same value it is inefficient to store
+ * them individually. Instead only non-zero registers are stored. These
+ * registers are stored as nodes in a sorted link list. For example the
+ * registers
+ *
+ *     +-+-+-+-+-+-+-+-+
+ *     |0|3|0|0|1|1|0|2|
+ *     +-+-+-+-+-+-+-+-+
+ *
+ * are represented with the following linked list (sorted by index):
+ *
+ *            index
+ *              |
+ *              v
+ *     +---+   +---+   +---+   +---+
+ *     |1,3|-->|4,1|-->|5,1|-->|7,2|
+ *     +---+   +---+   +---+   +---+
+ *                ^
+ *                |
+ *              value
+ *
+ * To avoid the worst case of traversing the linked list every time add()
+ * is called a temporary register buffer is used to store the new register
+ * values. When the buffer is full it is sorted and the linked list is
+ * updated. Because both the list and buffer are sorted this update can be
+ * done in one pass.
+ *
+ * Eventually the linked list grows too large to save memory. When this
+ * happens the HyperLogLog switches to a dense representation.
+ */
+static PyObject*
+getSparseRegister(HyperLogLog* self, uint64_t index)
+{
+    struct Node *current = NULL;
+
+    current = self->sparseRegisterList;
+
+    /* Can we used the cache? */
+    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
+        current = self->nodeCache;
+    }
+
+    while (current != NULL) {
+
+        if (current->index > index) {
+            return Py_BuildValue("k", 0);
+        }
+
+        else if (current->index == index) {
+            self->nodeCache = current;
+            return Py_BuildValue("k", current->fsb);
+        }
+
+        current = current->next;
+    }
+
+    return Py_BuildValue("k", 0);
+}
+
+
+int compareNodes(const void* a, const void* b) {
+    struct Node* A = (struct Node*) a;
+    struct Node* B = (struct Node*) b;
+
+    int result = -1;
+
+    if (A->index == B->index) {
+        if (A->fsb > B->fsb) {
+            result = 1;
+        }
+        else if (A->fsb < B->fsb) {
+            result = -1;
+        }
+        else {
+            result = 0;
+        }
+    }
+
+    else if (A->index > B->index) {
+        result = 1;
+    }
+
+    return result;
+}
+
+
+/* Updates the linked list using the items in the buffer. */
+void flushRegisterBuffer(HyperLogLog* self)
+{
+    uint64_t i;
+
+    struct Node* node;
+    struct Node *current = self->sparseRegisterList;
+    struct Node *next = NULL;
+    struct Node *prev = NULL;
+
+    qsort(self->sparseRegisterBuffer, self->bufferSize, sizeof(struct Node), compareNodes);
+
+    for (i = 0; i < self->bufferSize; i++) {
+
+        /* Create the new node from the current item in the buffer */
+        node = (struct Node*)malloc(sizeof(struct Node));
+        node->fsb = self->sparseRegisterBuffer[i].fsb;
+        node->index = self->sparseRegisterBuffer[i].index;
+        node->next = NULL;
+
+        /* If head doesn't exist then set it */
+        if (self->sparseRegisterList == NULL) {
+            self->sparseRegisterList = node;
+            self->histogram[0]--;
+            self->histogram[(uint8_t)node->fsb]++;
+            self->listSize += 1;
+            prev = node;
+            continue;
+        }
+
+        /* Try to use the last node */
+        if (prev != NULL) {
+            current = prev;
+        }
+        else {
+            current = self->sparseRegisterList;
+        }
+
+        while (current != NULL) {
+
+            // Are we updating an existing node?
+            if (current->index == node->index) {
+                if (current->fsb < node->fsb) {
+                    self->histogram[(uint8_t)current->fsb]--;
+                    self->histogram[(uint8_t)node->fsb]++;
+                    current->fsb = node->fsb;
+                }
+                prev = current;
+
+                /* Since we are updating an existing node, we can free the new node */
+                free(node);
+
+                break;
+            }
+
+            // Are we creating a new head?
+            if (current->index > node->index) {
+                node->next = current;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                self->sparseRegisterList = node;
+                self->listSize += 1;
+                prev = node;
+                break;
+            }
+
+            // Are we creating a new tail?
+            if (current->next == NULL) {
+                current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                self->listSize += 1;
+                prev = node;
+                break;
+            }
+
+            // Are inserting between nodes?
+            if (current->next->index > node->index) {
+                node->next = current->next;
+                current->next = node;
+                self->histogram[0]--;
+                self->histogram[(uint8_t)node->fsb]++;
+                self->listSize += 1;
+                prev = node;
+                break;
+            }
+
+            next = current->next;
+            current = next;
+        }
+    }
+
+    self->bufferSize = 0;
+}
+
+
+static void
+HyperLogLog_dealloc(HyperLogLog* self)
+{
+    free(self->histogram);
+    free(self->registers);
+
+    if (self->isSparse) {
+        struct Node *next = NULL;
+        struct Node *current = self->sparseRegisterList;
+        while (current != NULL) {
+            next = current->next;
+            free(current);
+            current = next;
+        }
+
+        free(self->sparseRegisterBuffer);
+    }
+
+    Py_TYPE(self)->tp_free((PyObject*) self);
+}
+
+
+static PyObject*
+HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
+{
+    HyperLogLog* self;
+    self = (HyperLogLog*)type->tp_alloc(type, 0);
+    return (PyObject*)self;
+}
+
+
+static int
+HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
+{
+    static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", "max_sparse_buffer_size", NULL};
+    uint64_t sparse = 0;
+    uint64_t maxSparseListSize = 0;
+    uint64_t maxSparseBufferSize = 0;
+
+    self->seed = 314;  /* Chosen arbitrarily */
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|iikk", kwlist, &self->p, &self->seed, &sparse, &maxSparseListSize, &maxSparseBufferSize)) {
+        return -1;
+    }
+
+    if (self->p < 2 || self->p > 63) {
+        char* msg = "p is out of range";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return -1;
+    }
+
+    self->size = 1UL << self->p;
+    self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
+    self->histogram[0] = self->size; /* Set the zeroes count */
+
+    self->added = 0;
+    self->cache = 0;
+    self->isCached = 0;
+    self->listSize = 0;
+
+    if (sparse) {
+        self->isSparse = 1;
+
+        if (maxSparseListSize > 0) {
+            self->maxListSize = maxSparseListSize;
+        }
+        else {
+            uint64_t defaultSize = self->size/2;
+            uint64_t maxDefaultSize = 1 << 20;
+
+            if (maxDefaultSize < defaultSize) {
+                self->maxListSize = maxDefaultSize;
+            }
+            else {
+                self->maxListSize = defaultSize;
+            }
+        }
+
+        if (maxSparseBufferSize > 0) {
+            self->maxBufferSize = maxSparseBufferSize;
+        }
+        else {
+            uint64_t defaultSize = self->maxListSize/2;
+            uint64_t maxDefaultSize = 200000;
+
+            if (maxDefaultSize < defaultSize) {
+                self->maxBufferSize = maxDefaultSize;
+            }
+            else {
+                self->maxBufferSize = defaultSize;
+            }
+        }
+
+        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferSize);
+    }
+    else {
+        uint64_t bytes = (self->size*6)/8 + 1;
+        self->registers = (char *)calloc(bytes, sizeof(char));
+
+        if (self->registers == NULL) {
+            char* msg = (char*) malloc(128 * sizeof(char));
+            sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+            PyErr_SetString(PyExc_MemoryError, msg);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static PyMemberDef HyperLogLog_members[] = {
+    {NULL} /* Sentinel */
+};
+
+/* Add an element. */
+static PyObject*
+HyperLogLog_add(HyperLogLog* self, PyObject* args)
+{
+    const char* data;
+    const uint64_t dataLen;
+    uint64_t hash, index, fsb, newFsb;
+
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
+    hash = MurmurHash64A((void*)data, dataLen, self->seed);
+
+    index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
+    newFsb = hash << self->p; /* Remove the first p bits */
+    newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
+    self->added++; /* Increment method call counter */
+
+    if (self->isSparse) {
+
+        /* Add an element to the buffer if there is room */
+        if (self->bufferSize < self->maxBufferSize) {
+            self->sparseRegisterBuffer[self->bufferSize].index = index;
+            self->sparseRegisterBuffer[self->bufferSize].fsb = newFsb;
+            self->bufferSize++;
+        }
+
+        /* Otherwise flush the buffer and then add */
+        else {
+            flushRegisterBuffer(self);
+            self->bufferSize = 1;
+            self->sparseRegisterBuffer[0].index = index;
+            self->sparseRegisterBuffer[0].fsb = newFsb;
+        }
+
+        /* Switch to dense representation? */
+        if (self->listSize >= self->maxListSize) {
+
+            uint64_t bytes = (self->size*6)/8 + 1;
+            self->registers = (char *)calloc(bytes, sizeof(char));
+
+            if (self->registers == NULL) {
+                char* msg = (char*) malloc(128 * sizeof(char));
+                sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+                PyErr_SetString(PyExc_MemoryError, msg);
+                Py_RETURN_FALSE;
+            }
+
+            flushRegisterBuffer(self);
+
+            struct Node *next = NULL;
+            struct Node *current = self->sparseRegisterList;
+
+            while (current != NULL) {
+                setDenseRegister(current->index, (uint8_t)current->fsb, self->registers);
+                next = current->next;
+                current = next;
+            }
+
+            current = self->sparseRegisterList;
+
+            while (current != NULL) {
+                next = current;
+                current = current->next;
+                free(next);
+            }
+
+            free(self->sparseRegisterBuffer);
+            free(self->nodeCache);
+            self->isSparse = 0;
+        }
+
+        self->isCached = 0;
+    }
+
+    else {
+        fsb = getDenseRegister(index, self->registers);
+
+        if (newFsb > fsb) {
+            setDenseRegister(index, (uint8_t)newFsb, self->registers);
+            self->histogram[newFsb] += 1; /* Increment the new count */
+            self->isCached = 0;
+
+            if (self->histogram[fsb] == 0) {
+                self->histogram[0] -= 1;
+            }
+
+            else {
+                self->histogram[fsb] -= 1;
+            }
+
+            Py_RETURN_TRUE;
+        }
+    }
+
+    Py_RETURN_FALSE;
+};
+
+
+/* Get a cardinality estimate */
+static PyObject*
+HyperLogLog_cardinality(HyperLogLog* self)
+{
+    if (self->isCached) {
+        return Py_BuildValue("K", self->cache);
+    }
+
+    else if (self->isSparse && self->bufferSize > 0) {
+        flushRegisterBuffer(self);
+    }
+
+    double alpha = 0.7213475;
+    double m = (double)self->size;
+    double z = m*tau((m - (double)self->histogram[self->p + 1])/m);
+
+    uint64_t k;
+    for (k = 64 - self->p; k >= 1; --k) {
+        z += self->histogram[k];
+        z *= 0.5;
+    }
+
+    z += m*sigma((double)self->histogram[0]/m);
+    uint64_t estimate = (uint64_t) round(alpha*m*(m/z));
+
+    self->cache = estimate;
+    self->isCached = 1;
+
+    return Py_BuildValue("K", estimate);
+}
+
+
+/* Gets the a register value by index */
+static PyObject*
+HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
+{
+    unsigned long index;
+
+    if (!PyArg_ParseTuple(args, "k", &index)) return NULL;
+    if (!isValidIndex(index, self->size)) return NULL;
+
+    if (self->isSparse) {
+        return getSparseRegister(self, index);
+    }
+
+    return Py_BuildValue("k", getDenseRegister((uint8_t)index, self->registers));
+}
+
+
+/* Gets a dictionary of internal attributes and their values */
+static PyObject*
+HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
+{
+    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i}",
+        "added", self->added,
+        "list_size", self->listSize,
+        "buffer_size", self->bufferSize,
+        "cache", self->cache,
+        "is_cached", self->isCached,
+        "is_sparse", self->isSparse
+    );
+}
+
+
+/* Get a Murmur64A hash of a string, buffer or bytes object. */
+static PyObject*
+HyperLogLog_hash(HyperLogLog* self, PyObject* args)
+{
+    const char* data;
+    const uint64_t dataLen;
+
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
+
+    uint64_t hash = MurmurHash64A((void*) data, dataLen, self->seed);
+    return Py_BuildValue("K", hash);
+}
+
+
+/* Gets a histogram of first set bit positions as a list of ints. */
+static PyObject*
+HyperLogLog__histogram(HyperLogLog* self)
+{
+    PyObject* histogram = PyList_New(65);
+
+    for (int i = 0; i < 65; i++)
+    {
+        PyObject* count = Py_BuildValue("i", self->histogram[i]);
+        PyList_SetItem(histogram, i, count);
+    }
+    return histogram;
+}
+
+
+/* Merges another HyperLogLog into the current HyperLogLog. The registers of
+ * the other HyperLogLog are unaffected. */
+static PyObject*
+HyperLogLog_merge(HyperLogLog* self, PyObject* args)
+{
+    PyObject* hll;
+    uint64_t hllSize;
+
+    if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
+
+    PyObject* size = PyObject_CallMethod(hll, "size", NULL);
+
+    #if PY_MAJOR_VERSION >= 3
+        hllSize = PyLong_AsLong(size);
+    #else
+        hllSize = PyInt_AS_LONG(size);
+    #endif
+
+    if (hllSize > self->size) {
+        PyErr_SetString(PyExc_ValueError, "Unequal sizes");
+        return NULL;
+    }
+
+    Py_DECREF(size);
+    self->isCached = 0;
+
+    for (uint64_t i = 0; i < self->size; i++) {
+        PyObject* newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
+        unsigned long newVal = PyLong_AsUnsignedLong(newReg);
+        uint64_t oldVal = getDenseRegister(i, self->registers);
+
+        if (oldVal < newVal) {
+            setDenseRegister(i, newVal, self->registers);
+            self->histogram[newVal] += 1; /* Increment new count */
+
+            if (self->histogram[oldVal] > 0) {
+                self->histogram[oldVal] -= 1; /* Decrement old count */
+            }
+
+            else {
+                self->histogram[0] += 1; /* Increment zeroes count */
+            }
+        }
+
+        Py_DECREF(newReg);
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+
+static PyObject*
+HyperLogLog_reduce(HyperLogLog* self)
+{
+    PyObject* val;
+    PyObject* state = PyList_New(self->size + 65);
+
+    for (int i = 0; i < 65; i++) {
+        val = Py_BuildValue("k", self->histogram[i]);
+        PyList_SetItem(state, i, val);
+    }
+
+    for (uint64_t i = 65; i < self->size + 65; i++)
+    {
+        val = Py_BuildValue("k", getDenseRegister(i - 65, self->registers));
+        PyList_SetItem(state, i, val);
+    }
+
+    PyObject* args = Py_BuildValue("(ii)", self->p, self->seed);
+    return Py_BuildValue("(ONN)", Py_TYPE(self), args, state);
+}
+
+
+/* Gets the seed value used in the Murmur hash. */
+static PyObject*
+HyperLogLog_seed(HyperLogLog* self)
+{
+    return Py_BuildValue("k", self->seed);
+}
+
+
+static PyObject*
+HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
+{
+    PyObject* dump;
+    PyObject* valPtr;
+    unsigned long val;
+
+    if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
+
+    for (int i = 0; i < 65; i++) {
+        valPtr = PyList_GetItem(dump, i);
+        val = PyLong_AsUnsignedLong(valPtr);
+        self->histogram[i] = val;
+    }
+
+    for (uint64_t i = 65; i < self->size + 65; i++)
+    {
+        valPtr = PyList_GetItem(dump, i);
+        val = PyLong_AsUnsignedLong(valPtr);
+        setDenseRegister(i-63, (uint8_t)val, self->registers);
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+
+/* Gets the number of registers. */
+static PyObject*
+HyperLogLog_size(HyperLogLog* self)
+{
+    return Py_BuildValue("i", self->size);
+}
+
+
+static PyMethodDef HyperLogLog_methods[] = {
+    {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
+     "Add an element."
+    },
+    {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
+     "Get the cardinality."
+    },
+    {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
+     "Merge another HyperLogLog."
+    },
+    {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
+     "Get a MurmurHash64A hash."
+    },
+    {"seed", (PyCFunction)HyperLogLog_seed, METH_NOARGS,
+     "Get the hash function seed."
+    },
+    {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
+     "Get the number of registers."
+    },
+    {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
+     "Get the value of a register."
+    },
+    {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
+     "Get a histogram of the register values."
+    },
+    {"_get_meta", (PyCFunction)HyperLogLog__get_meta, METH_NOARGS,
+     "Get the values of internal attributes."
+    },
+    {"__reduce__", (PyCFunction)HyperLogLog_reduce, METH_NOARGS,
+     "Serialization helper function for pickling."
+    },
+    {"__setstate__", (PyCFunction)HyperLogLog_set_state, METH_VARARGS,
+    "De-serialization helper function for pickling."
+    },
+    {NULL}  /* Sentinel */
+};
+
+
+static PyTypeObject HyperLogLogType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "HLL.HyperLogLog",               /* tp_name */
+    sizeof(HyperLogLog),             /* tp_basicsize */
+    0,                               /* tp_itemsize */
+    (destructor)HyperLogLog_dealloc, /* tp_dealloc */
+    0,                               /* tp_print */
+    0,                               /* tp_getattr */
+    0,                               /* tp_setattr */
+    0,                               /* tp_compare */
+    0,                               /* tp_repr */
+    0,                               /* tp_as_number */
+    0,                               /* tp_as_sequence */
+    0,                               /* tp_as_mapping */
+    0,                               /* tp_hash */
+    0,                               /* tp_call */
+    0,                               /* tp_str */
+    0,                               /* tp_getattro */
+    0,                               /* tp_setattro */
+    0,                               /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT |
+        Py_TPFLAGS_BASETYPE,         /* tp_flags */
+    "HyperLogLog object",            /* tp_doc */
+    0,                               /* tp_traverse */
+    0,                               /* tp_clear */
+    0,                               /* tp_richcompare */
+    0,                               /* tp_weaklistoffset */
+    0,                               /* tp_iter */
+    0,                               /* tp_iternext */
+    HyperLogLog_methods,             /* tp_methods */
+    HyperLogLog_members,             /* tp_members */
+    0,                               /* tp_getset */
+    0,                               /* tp_base */
+    0,                               /* tp_dict */
+    0,                               /* tp_descr_get */
+    0,                               /* tp_descr_set */
+    0,                               /* tp_dictoffset */
+    (initproc)HyperLogLog_init,      /* tp_init */
+    0,                               /* tp_alloc */
+    HyperLogLog_new,                 /* tp_new */
+};
+
+
+#if PY_MAJOR_VERSION >= 3
+    static PyModuleDef HyperLogLogmodule = {
+        PyModuleDef_HEAD_INIT,
+        "HyperLogLog",
+        "A space efficient cardinality estimator.",
+        -1,
+        NULL, NULL, NULL, NULL, NULL
+    };
+#else
+    static PyMethodDef module_methods[] = {
+        {NULL}  /* Sentinel */
+    };
+#endif
+
+#if PY_MAJOR_VERSION >=3
+    PyMODINIT_FUNC
+    PyInit_HLL(void)
+#else
+    /* declarations for DLL import or export */
+    #ifndef PyMODINIT_FUNC
+        #define PyMODINIT_FUNC void
+    #endif
+    PyMODINIT_FUNC initHLL(void)
+#endif
+
+{
+    PyObject* m;
+    #if PY_MAJOR_VERSION >= 3
+        if (PyType_Ready(&HyperLogLogType) < 0) return NULL;
+        m = PyModule_Create(&HyperLogLogmodule);
+        if (m == NULL) return NULL;
+    #else
+        if (PyType_Ready(&HyperLogLogType) < 0) return;
+        char* info = "HyperLogLog cardinality estimator.";
+        m = Py_InitModule3("HLL", module_methods, info);
+        if (m == NULL) return;
+    #endif
+
+    Py_INCREF(&HyperLogLogType);
+    PyModule_AddObject(m, "HyperLogLog", (PyObject*)&HyperLogLogType);
+
+    #if PY_MAJOR_VERSION >= 3
+        return m;
+    #endif
+}
 
 
 /* ========================== Helper functions ============================= */
@@ -1070,6 +1054,7 @@ static inline uint8_t clz(uint64_t x) {
     return zeroes[fsbByte] - shift;
 }
 
+
 static inline double sigma(double x) {
     if (x == 1.0) {
         return INFINITY;
@@ -1088,6 +1073,7 @@ static inline double sigma(double x) {
 
     return z;
 }
+
 
 static inline double tau(double x) {
     if (x == 0.0 || x == 1.0) {
@@ -1108,6 +1094,7 @@ static inline double tau(double x) {
     return z/3;
 }
 
+
 /* Print a the bits in a byte. */
 void printByte(char b)
 {
@@ -1115,6 +1102,7 @@ void printByte(char b)
         printf("%d", !!((b << i) & 0x80));
     }
 }
+
 
 /* Check if a register index is valid, if not then set an error message. */
 uint8_t isValidIndex(uint64_t index, uint64_t size)
