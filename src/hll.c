@@ -317,6 +317,7 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
 }
 
 
+
 int compareNodes(const void* a, const void* b) {
     struct Node* A = (struct Node*) a;
     struct Node* B = (struct Node*) b;
@@ -794,25 +795,93 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
     return Py_None;
 }
 
-
+/*
+ * HyperLogLog's are serialized using a single list. The first 7 elements
+ * are fields, the next 65 elements are the histogram, and the remaining
+ * elements represent the registers. This scheme is diagrammed below:
+ *
+ *     Index  PyType  Contains
+ *     -----  ------
+ *     0      version
+ *     1      isSparse
+ *     2      added
+ *     3      list_size
+ *     4      isCached
+ *     5      int        cache
+ *     6      list node cache index
+ *
+ *     7-72   histogram
+ *     73-A   registers
+ *
+ * where A is the number of allocated registers. If the HyperLogLog is sparse,
+ * then the registers in 73-A are the tuple (index, value). If the HyperLogLog
+ * is dense then the registers in 73-A are the values only (register indices
+ * are computed from the list position).
+ */
 static PyObject*
 HyperLogLog_reduce(HyperLogLog* self)
 {
     PyObject* val;
-    PyObject* state = PyList_New(self->size + 65);
+    PyObject* state;
+    uint64_t dumpSize;
 
-    for (int i = 0; i < 65; i++) {
+    if (self->isSparse) {
+        flushRegisterBuffer(self);
+        dumpSize = self->listSize + 65 + 7;
+    }
+
+    else {
+        dumpSize = self->size + 65 + 7;
+    }
+
+    state = PyList_New(dumpSize);
+
+    for (int i = 0; i < dumpSize; i++) {
+        val = Py_BuildValue("k", 0);
+        PyList_SetItem(state, i, val);
+    }
+
+    PyList_SetItem(state, 0, Py_BuildValue("k", (uint64_t)self->isSparse));
+    PyList_SetItem(state, 1, Py_BuildValue("k", self->added));
+    PyList_SetItem(state, 2, Py_BuildValue("k", self->listSize));
+    PyList_SetItem(state, 3, Py_BuildValue("k", self->isCached));
+    PyList_SetItem(state, 4, Py_BuildValue("k", self->cache));
+    PyList_SetItem(state, 5, Py_BuildValue("k", 0)); // node cache index
+    PyList_SetItem(state, 6, Py_BuildValue("k", 0)); // node cache value
+
+    /* Set histogram values */
+    for (int i = 7; i < 72; i++) {
         val = Py_BuildValue("k", self->histogram[i]);
         PyList_SetItem(state, i, val);
     }
 
-    for (uint64_t i = 65; i < self->size + 65; i++)
-    {
-        val = Py_BuildValue("k", getDenseRegister(i - 65, self->registers));
-        PyList_SetItem(state, i, val);
+    /* Serialize sparse representation */
+    if (self->isSparse) {
+        struct Node *current = NULL;
+        PyObject *pyList = NULL;
+
+        current = self->sparseRegisterList;
+        uint64_t j = 72;
+
+        while (current != NULL) {
+            pyList = PyList_New(2);
+            PyList_SetItem(pyList, 0, Py_BuildValue("k", current->index));
+            PyList_SetItem(pyList, 1, Py_BuildValue("k", current->fsb));
+            PyList_SetItem(state, j, pyList);
+            current = current->next;
+            j++;
+        }
     }
 
-    PyObject* args = Py_BuildValue("(ii)", self->p, self->seed);
+    /* Serialize dense representation */
+    else {
+        for (uint64_t i = 72; i < self->size + 72; i++) {
+            val = Py_BuildValue("k", getDenseRegister(i - 72, self->registers));
+            PyList_SetItem(state, i, val);
+        }
+    }
+
+    PyObject* args = Py_BuildValue("(iii)", self->p, self->seed, self->isSparse);
     return Py_BuildValue("(ONN)", Py_TYPE(self), args, state);
 }
 
@@ -834,13 +903,19 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
-    for (int i = 0; i < 65; i++) {
+    for (int i = 0; i < 6; i++) {
+        valPtr = PyList_GetItem(0, i);
+        val = PyLong_AsUnsignedLong(valPtr);
+        self->histogram[i] = val;
+    }
+
+    for (int i = 6; i < 65 + 7; i++) {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
         self->histogram[i] = val;
     }
 
-    for (uint64_t i = 65; i < self->size + 65; i++)
+    for (uint64_t i = 65 + 7; i < self->size + 65 + 7; i++)
     {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
