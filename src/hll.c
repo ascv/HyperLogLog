@@ -903,24 +903,54 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
-    for (int i = 0; i < 6; i++) {
-        valPtr = PyList_GetItem(0, i);
-        val = PyLong_AsUnsignedLong(valPtr);
-        self->histogram[i] = val;
-    }
+    printf("> 1\n");
 
-    for (int i = 6; i < 65 + 7; i++) {
+    self->isSparse = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 0));
+    self->added    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 1));
+    self->listSize = PyLong_AsUnsignedLong(PyList_GetItem(dump, 2));
+    self->isCached = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 3));
+    self->cache    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 4));
+    printf("> 2\n");
+
+    printf("isSparse: %i\n", self->isSparse);
+    printf("added:    %lu\n", self->added);
+    printf("listSize: %lu\n", self->listSize);
+    printf("isCached: %i\n", self->isCached);
+    printf("cache:    %lu\n", self->cache);
+
+    uint64_t dumpSize = self->isSparse ? self->size : self->listSize;
+    dumpSize += 65 + 7;
+    printf("> 3\n");
+
+    for (int i = 7; i < 65 + 7; i++) {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
         self->histogram[i] = val;
     }
+    printf("> 4\n");
 
-    for (uint64_t i = 65 + 7; i < self->size + 65 + 7; i++)
-    {
-        valPtr = PyList_GetItem(dump, i);
-        val = PyLong_AsUnsignedLong(valPtr);
-        setDenseRegister(i-63, (uint8_t)val, self->registers);
+    if (self->isSparse) {
+        printf("sparse pickling..\n");
+        //uint64_t index;
+        //uint64_t fsb;
+        //struct Node* node = NULL;
+
+        //for (uint64_t i = 65 + 7; i < dumpSize; i++) {
+        //    lst = PyList_GetItem(dump, i);
+        //    index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
+        //    fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
+        //}
     }
+    else {
+        printf("> dense pickling..\n");
+        for (uint64_t i = 65 + 7; i < dumpSize; i++) {
+            valPtr = PyList_GetItem(dump, i);
+            val = PyLong_AsUnsignedLong(valPtr);
+            setDenseRegister(i-63, (uint8_t)val, self->registers);
+        }
+        printf("> 5\n");
+    }
+    printf("> 6\n");
 
     Py_INCREF(Py_None);
     return Py_None;
