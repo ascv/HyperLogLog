@@ -801,21 +801,18 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
  * elements represent the registers. Let N be the total number of elements in
  * in the list, then the serialization schema is:
  *
- *     Index  Contains
- *     -----  --------
+ *     Index  Description
+ *     -----  -----------
  *     0      version
- *     1      isSparse
- *     2      added
- *     3      list_size
- *     4      isCached
- *     5      cache
- *     6      list node cache index
- *     7-72   histogram
- *     73-N   registers
- *
- * If the HyperLogLog is using sparse representation, then registers 73-N are
- * tuples of the form (register index, register value). Otherwise registers
- * 73-N are integers.
+ *     1      isSparse field
+ *     2      added field
+ *     3      listSize field
+ *     4      isCached field
+ *     5      cache field
+ *     6      index of node that is currently cached
+ *     7-72   register histogram values
+ *     73-N   register values, if sparse then tuples of the form (register
+ *            index, register value) otherwise integers
  */
 static PyObject*
 HyperLogLog_reduce(HyperLogLog* self)
@@ -845,8 +842,8 @@ HyperLogLog_reduce(HyperLogLog* self)
     PyList_SetItem(state, 2, Py_BuildValue("k", self->listSize));
     PyList_SetItem(state, 3, Py_BuildValue("k", self->isCached));
     PyList_SetItem(state, 4, Py_BuildValue("k", self->cache));
-    PyList_SetItem(state, 5, Py_BuildValue("k", 0)); // node cache index
-    PyList_SetItem(state, 6, Py_BuildValue("k", 0)); // node cache value
+    PyList_SetItem(state, 5, Py_BuildValue("k", 0));
+    PyList_SetItem(state, 6, Py_BuildValue("k", 0)); /* reserved */
 
     /* Set histogram values */
     for (int i = 7; i < 72; i++) {
@@ -856,6 +853,12 @@ HyperLogLog_reduce(HyperLogLog* self)
 
     /* Serialize sparse representation */
     if (self->isSparse) {
+
+        if (self->nodeCache != NULL) {
+            PyList_SetItem(state, 5, Py_BuildValue("k", self->nodeCache->index));
+        }
+
+
         struct Node *current = NULL;
         PyObject *pyList = NULL;
 
@@ -900,6 +903,7 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     PyObject* dump;
     PyObject* valPtr;
     unsigned long val;
+    uint64_t nodeCacheIndex;
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
@@ -908,6 +912,7 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     self->listSize = PyLong_AsUnsignedLong(PyList_GetItem(dump, 2));
     self->isCached = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 3));
     self->cache    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 4));
+    nodeCacheIndex = PyLong_AsUnsignedLong(PyList_GetItem(dump, 5));
 
     uint64_t dumpSize = self->isSparse ? self->listSize : self->size;
     dumpSize += 65 + 7;
@@ -943,6 +948,10 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
             }
             else {
                 prev->next = node;
+            }
+
+            if (node->index == nodeCacheIndex) {
+                self->nodeCache = node;
             }
         }
     }
