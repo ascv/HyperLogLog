@@ -393,7 +393,7 @@ void flushRegisterBuffer(HyperLogLog* self)
                 }
                 prev = current;
 
-                /* Since we are updating an existing node, we can free the new node */
+                /* We don't need the new node */
                 free(node);
 
                 break;
@@ -821,6 +821,8 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 static PyObject*
 HyperLogLog_reduce(HyperLogLog* self)
 {
+    printf("reduce()\n");
+    printf("========\n\n");
     PyObject* val;
     PyObject* state;
     uint64_t dumpSize;
@@ -851,7 +853,7 @@ HyperLogLog_reduce(HyperLogLog* self)
 
     /* Set histogram values */
     for (int i = 7; i < 72; i++) {
-        val = Py_BuildValue("k", self->histogram[i]);
+        val = Py_BuildValue("k", self->histogram[i - 7]);
         PyList_SetItem(state, i, val);
     }
 
@@ -897,60 +899,89 @@ HyperLogLog_seed(HyperLogLog* self)
 static PyObject*
 HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 {
+
+    printf("set_state()\n");
+    printf("===========\n\n");
     PyObject* dump;
     PyObject* valPtr;
     unsigned long val;
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
-    printf("> 1\n");
-
     self->isSparse = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 0));
     self->added    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 1));
     self->listSize = PyLong_AsUnsignedLong(PyList_GetItem(dump, 2));
     self->isCached = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 3));
     self->cache    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 4));
-    printf("> 2\n");
 
-    printf("isSparse: %i\n", self->isSparse);
-    printf("added:    %lu\n", self->added);
-    printf("listSize: %lu\n", self->listSize);
-    printf("isCached: %i\n", self->isCached);
-    printf("cache:    %lu\n", self->cache);
+    printf("> isSparse: %i\n", self->isSparse);
+    printf("> added:    %lu\n", self->added);
+    printf("> listSize: %lu\n", self->listSize);
+    printf("> isCached: %i\n", self->isCached);
+    printf("> cache:    %lu\n", self->cache);
 
-    uint64_t dumpSize = self->isSparse ? self->size : self->listSize;
+    uint64_t dumpSize = self->isSparse ? self->listSize : self->size;
     dumpSize += 65 + 7;
-    printf("> 3\n");
+    printf("> dumpSize: %lu\n", dumpSize);
+    printf("> setting histogram..\n");
 
     for (int i = 7; i < 65 + 7; i++) {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
-        self->histogram[i] = val;
+        self->histogram[i - 7] = val;
     }
-    printf("> 4\n");
 
     if (self->isSparse) {
-        printf("sparse pickling..\n");
-        //uint64_t index;
-        //uint64_t fsb;
-        //struct Node* node = NULL;
+        printf("> sparse pickling..\n");
+        uint64_t index;
+        uint64_t fsb;
+        struct Node* node = NULL;
+        struct Node* prev = NULL;
+        PyObject *lst = NULL;
 
-        //for (uint64_t i = 65 + 7; i < dumpSize; i++) {
-        //    lst = PyList_GetItem(dump, i);
-        //    index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
-        //    fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
-        //}
+        self->sparseRegisterList = node;
+        printf("> pylist size is %lu..\n", PyList_Size(dump));
+
+        //FIX: dumpsize not equal to list size??? so it segfaults <-- FIXED
+        for (uint64_t i = 65 + 7; i < dumpSize; i++) {
+            lst = PyList_GetItem(dump, i);
+            printf("> .");
+            index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
+            printf(".");
+            fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
+            printf(".");
+            printf("\n>i: %lu index: %lu value: %lu\n", i, index, fsb);
+
+            // NOW RE-CREATE LINKED LIST AND STATE ON NEW HYPERLOGLOG
+            node = (struct Node*)malloc(sizeof(struct Node));
+            printf("> .");
+            node->index = index;
+            printf(".");
+            node->fsb = fsb;
+            printf(".");
+            node->next = NULL;
+
+            if (i == 65 + 7) {
+                printf("+");
+                self->sparseRegisterList = node;
+                prev = node;
+            }
+
+            else {
+                printf("-");
+                prev->next = node;
+            }
+
+            printf("\n");
+        }
     }
     else {
-        printf("> dense pickling..\n");
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             valPtr = PyList_GetItem(dump, i);
             val = PyLong_AsUnsignedLong(valPtr);
             setDenseRegister(i-63, (uint8_t)val, self->registers);
         }
-        printf("> 5\n");
     }
-    printf("> 6\n");
 
     Py_INCREF(Py_None);
     return Py_None;
