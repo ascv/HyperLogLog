@@ -704,13 +704,18 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 static PyObject*
 HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 {
-    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i}",
+    uint64_t cacheIndex = self->nodeCache == NULL ? 0 : self->nodeCache->index;
+    uint64_t cacheValue = self->nodeCache == NULL ? 0 : self->nodeCache->fsb;
+
+    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i,s:k,s:k}",
         "added", self->added,
         "list_size", self->listSize,
         "buffer_size", self->bufferSize,
         "cache", self->cache,
         "is_cached", self->isCached,
-        "is_sparse", self->isSparse
+        "is_sparse", self->isSparse,
+        "node_cache_index", cacheIndex,
+        "node_cache_value", cacheValue
     );
 }
 
