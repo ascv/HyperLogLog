@@ -80,18 +80,18 @@ class TestMerging(unittest.TestCase):
             hll.merge(hll2)
 
     def test_merging(self):
-        #expected = bytearray(4)
-        #expected[0] = 1
-        #expected[3] = 1
+        expected = bytearray(4)
+        expected[0] = 1
+        expected[3] = 1
 
         hll = HyperLogLog(2)
         hll2 = HyperLogLog(2)
 
-        #hll.set_register(0, 1)
-        #hll2.set_register(3, 1)
+        hll.set_register(0, 1)
+        hll2.set_register(3, 1)
 
         hll.merge(hll2)
-        #self.assertEqual(hll.registers(), expected)
+        self.assertEqual(hll.registers(), expected)
 
 class TestPickling(unittest.TestCase):
 
@@ -102,31 +102,56 @@ class TestPickling(unittest.TestCase):
         for hll, n in zip(hlls, cardinalities):
             for i in range(1, n):
                 hll.add(str(i))
-        self.hlls = hlls
+        self.dense_hlls = hlls
 
-    def test_pickled_cardinality(self):
-        for hll in self.hlls:
-            expected = hll.cardinality()
-            hll2 = pickle.loads(pickle.dumps(hll))
-            self.assertEqual(expected, hll2.cardinality())
+        hlls = [HyperLogLog(x, randint(1, 10**6), sparse=True) for x in range(4, 16)]
+        cardinalities = [x**5 for x in range(1, 16)]
 
-    def test_pickled_seed(self):
-        for hll in self.hlls:
-            expected = hll.seed()
-            hll2 = pickle.loads(pickle.dumps(hll))
-            self.assertEqual(expected, hll2.seed())
+        for hll, n in zip(hlls, cardinalities):
+            for i in range(1, n):
+                hll.add(str(i))
 
-    def test_pickled_register_histogram(self):
-        for hll in self.hlls:
-            expected = hll._histogram()
-            hll2 = pickle.loads(pickle.dumps(hll))
-            self.assertEqual(expected, hll2._histogram())
+        self.sparse_hlls = hlls
 
-    def test_pickled_size(self):
-         for hll in self.hlls:
-            expected = hll.size()
+    def test_dense_pickled_cardinality(self):
+        for hll in self.dense_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
-            self.assertEqual(expected, hll2.size())
+            self.assertEqual(hll.cardinality(), hll2.cardinality())
+
+    def test_dense_pickled_seed(self):
+        for hll in self.dense_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll.seed(), hll2.seed())
+
+    def test_dense_pickled_register_histogram(self):
+        for hll in self.dense_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll._histogram(), hll2._histogram())
+
+    def test_dense_pickled_size(self):
+         for hll in self.dense_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll.size(), hll2.size())
+
+    def test_sparse_pickled_cardinality(self):
+        for hll in self.sparse_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll.cardinality(), hll2.cardinality())
+
+    def test_sparse_pickled_seed(self):
+        for hll in self.sparse_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll.seed(), hll2.seed())
+
+    def test_sparse_pickled_register_histogram(self):
+        for hll in self.sparse_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll._histogram(), hll2._histogram())
+
+    def test_sparse_pickled_size(self):
+         for hll in self.sparse_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            self.assertEqual(hll.size(), hll2.size())
 
 if __name__ == '__main__':
     unittest.main()
