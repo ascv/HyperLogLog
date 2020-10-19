@@ -798,31 +798,28 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 /*
  * HyperLogLog's are serialized using a single list. The first 7 elements
  * are fields, the next 65 elements are the histogram, and the remaining
- * elements represent the registers. This scheme is diagrammed below:
+ * elements represent the registers. Let N be the total number of elements in
+ * in the list, then the serialization schema is:
  *
- *     Index  PyType  Contains
- *     -----  ------
+ *     Index  Contains
+ *     -----  --------
  *     0      version
  *     1      isSparse
  *     2      added
  *     3      list_size
  *     4      isCached
- *     5      int        cache
+ *     5      cache
  *     6      list node cache index
- *
  *     7-72   histogram
- *     73-A   registers
+ *     73-N   registers
  *
- * where A is the number of allocated registers. If the HyperLogLog is sparse,
- * then the registers in 73-A are the tuple (index, value). If the HyperLogLog
- * is dense then the registers in 73-A are the values only (register indices
- * are computed from the list position).
+ * If the HyperLogLog is using sparse representation, then registers 73-N are
+ * tuples of the form (register index, register value). Otherwise registers
+ * 73-N are integers.
  */
 static PyObject*
 HyperLogLog_reduce(HyperLogLog* self)
 {
-    printf("reduce()\n");
-    printf("========\n\n");
     PyObject* val;
     PyObject* state;
     uint64_t dumpSize;
@@ -900,8 +897,6 @@ static PyObject*
 HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 {
 
-    printf("set_state()\n");
-    printf("===========\n\n");
     PyObject* dump;
     PyObject* valPtr;
     unsigned long val;
@@ -914,16 +909,8 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     self->isCached = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 3));
     self->cache    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 4));
 
-    printf("> isSparse: %i\n", self->isSparse);
-    printf("> added:    %lu\n", self->added);
-    printf("> listSize: %lu\n", self->listSize);
-    printf("> isCached: %i\n", self->isCached);
-    printf("> cache:    %lu\n", self->cache);
-
     uint64_t dumpSize = self->isSparse ? self->listSize : self->size;
     dumpSize += 65 + 7;
-    printf("> dumpSize: %lu\n", dumpSize);
-    printf("> setting histogram..\n");
 
     for (int i = 7; i < 65 + 7; i++) {
         valPtr = PyList_GetItem(dump, i);
@@ -932,7 +919,6 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     }
 
     if (self->isSparse) {
-        printf("> sparse pickling..\n");
         uint64_t index;
         uint64_t fsb;
         struct Node* node = NULL;
@@ -940,39 +926,24 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
         PyObject *lst = NULL;
 
         self->sparseRegisterList = node;
-        printf("> pylist size is %lu..\n", PyList_Size(dump));
 
-        //FIX: dumpsize not equal to list size??? so it segfaults <-- FIXED
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             lst = PyList_GetItem(dump, i);
-            printf("> .");
             index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
-            printf(".");
             fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
-            printf(".");
-            printf("\n>i: %lu index: %lu value: %lu\n", i, index, fsb);
 
-            // NOW RE-CREATE LINKED LIST AND STATE ON NEW HYPERLOGLOG
             node = (struct Node*)malloc(sizeof(struct Node));
-            printf("> .");
             node->index = index;
-            printf(".");
             node->fsb = fsb;
-            printf(".");
             node->next = NULL;
 
             if (i == 65 + 7) {
-                printf("+");
                 self->sparseRegisterList = node;
                 prev = node;
             }
-
             else {
-                printf("-");
                 prev->next = node;
             }
-
-            printf("\n");
         }
     }
     else {
