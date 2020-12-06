@@ -1,4 +1,5 @@
 #define PY_SSIZE_T_CLEAN
+#define HLL_VERSION "2.0.1"
 
 #include <math.h>
 #include <Python.h>
@@ -9,6 +10,7 @@
 #include "hll.h"
 #include "structmember.h"
 #include "../lib/murmur2.h"
+
 
 typedef struct {
     PyObject_HEAD
@@ -595,7 +597,7 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
 
             if (self->registers == NULL) {
                 char* msg = (char*) malloc(128 * sizeof(char));
-                sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+                sprintf(msg, "Failed to allocate %lu bytes.", bytes);
                 PyErr_SetString(PyExc_MemoryError, msg);
                 Py_RETURN_FALSE;
             }
@@ -704,10 +706,13 @@ HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 static PyObject*
 HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 {
+    char version[8];
+    sprintf(version, "%u.%u.%u", PY_MAJOR_VERSION, PY_MINOR_VERSION, PY_MICRO_VERSION);
+
     uint64_t cacheIndex = self->nodeCache == NULL ? 0 : self->nodeCache->index;
     uint64_t cacheValue = self->nodeCache == NULL ? 0 : self->nodeCache->fsb;
 
-    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i,s:k,s:k}",
+    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i,s:k,s:k,s:s,s:s}",
         "added", self->added,
         "list_size", self->listSize,
         "buffer_size", self->bufferSize,
@@ -715,7 +720,9 @@ HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
         "is_cached", self->isCached,
         "is_sparse", self->isSparse,
         "node_cache_index", cacheIndex,
-        "node_cache_value", cacheValue
+        "node_cache_value", cacheValue,
+        "py_version", version,
+        "hll_version", HLL_VERSION
     );
 }
 
