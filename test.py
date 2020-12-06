@@ -19,13 +19,13 @@ class TestAdd(unittest.TestCase):
     @unittest.skipIf(sys.version_info[0] > 2, 'buffer is deprecated in python 3.x')
     def test_add_buffer(self):
         try:
-            self.hll.add(buffer('asdf'))
+            self.hll.add(buffer('some characters'))
         except Exception as ex:
             self.fail('failed to add buffer: %s' % ex)
 
     def test_add_bytes(self):
         try:
-            self.hll.add(b'some bytes')
+            self.hll.add(b'some other characters')
         except Exception as ex:
             self.fail('failed to add bytes: %s' % ex)
 
@@ -50,14 +50,15 @@ class TestHyperLogLogConstructor(unittest.TestCase):
             HyperLogLog(64)
 
     def test_registers_initialized_to_zero(self):
-        hll = HyperLogLog(5)
+        hll = HyperLogLog(randint(2, 16))
         for i in range(hll.size()):
             self.assertEqual(hll._get_register(i), 0)
 
     def test_histogram_initialized_with_correct_counts(self):
-        hll = HyperLogLog(5)
+        k = randint(2, 10)
+        hll = HyperLogLog(k)
         hist = hll._histogram()
-        self.assertEqual(sum(hist), 32)
+        self.assertEqual(sum(hist), 2**k)
 
     def test_p_sets_size(self):
         for i in range(2, 6):
@@ -74,29 +75,31 @@ class TestHyperLogLogConstructor(unittest.TestCase):
 class TestMerging(unittest.TestCase):
 
     def test_only_same_size_can_be_merged(self):
-        hll = HyperLogLog(4)
-        hll2 = HyperLogLog(5)
         with self.assertRaises(Exception):
-            hll.merge(hll2)
+            hll = HyperLogLog(4)
+            hll.merge(HyperLogLog(5))
 
     def test_merging(self):
-        expected = bytearray(4)
-        expected[0] = 1
-        expected[3] = 1
+        k = randint(2, 8)
 
-        hll = HyperLogLog(2)
-        hll2 = HyperLogLog(2)
+        for i in range(randint(10, 100)):
+            hll_a.add(randint(0, 1024))
+            hll_b.add(randint(0, 1024))
 
-        hll.set_register(0, 1)
-        hll2.set_register(3, 1)
+        hll_a = HyperLogLog(k)
+        hll_b = HyperLogLog(k)
+        hll_c = HyperLogLog(k)
+        hll_c.merge(hll_a)
 
-        hll.merge(hll2)
-        self.assertEqual(hll.registers(), expected)
+        for i in 2**k:
+            max_fsb = max(hll_a._get_register(i), hll_b.get_register(i))
+            self.assertEqual(max_fsb, hll_c.get_register(i))
+
 
 class TestPickling(unittest.TestCase):
 
     def setUp(self):
-        hlls = [HyperLogLog(x, randint(1, 10**6)) for x in range(4, 16)]
+        hlls = [HyperLogLog(x, randint(1, 10**6), sparse=False) for x in range(4, 16)]
         cardinalities = [x**5 for x in range(1, 16)]
 
         for hll, n in zip(hlls, cardinalities):
