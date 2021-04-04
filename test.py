@@ -82,18 +82,20 @@ class TestMerging(unittest.TestCase):
     def test_merging(self):
         k = randint(2, 8)
 
-        for i in range(randint(10, 100)):
-            hll_a.add(randint(0, 1024))
-            hll_b.add(randint(0, 1024))
-
         hll_a = HyperLogLog(k)
         hll_b = HyperLogLog(k)
+
+        for i in range(randint(10, 100)):
+            hll_a.add(str(randint(0, 1024)))
+            hll_b.add(str(randint(0, 1024)))
+
         hll_c = HyperLogLog(k)
         hll_c.merge(hll_a)
+        hll_c.merge(hll_b)
 
-        for i in 2**k:
-            max_fsb = max(hll_a._get_register(i), hll_b.get_register(i))
-            self.assertEqual(max_fsb, hll_c.get_register(i))
+        for i in range(2**k):
+            max_fsb = max(hll_a._get_register(i), hll_b._get_register(i))
+            self.assertEqual(max_fsb, hll_c._get_register(i))
 
 
 class TestPickling(unittest.TestCase):
