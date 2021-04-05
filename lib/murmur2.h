@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 // MurmurHash2 was written by Austin Appleby, and is placed in the public
-// domain. The author hereby disclaims copyright to this source code.
+// domain. The author hereby disclaims copyright to the MurmurHash2 source code.
 
 #ifndef _MURMURHASH2_H_
 #define _MURMURHASH2_H_

@@ -11,7 +11,6 @@
 #include "structmember.h"
 #include "../lib/murmur2.h"
 
-
 typedef struct {
     PyObject_HEAD
     char* registers; /* Densely encoded registers */
@@ -25,7 +24,7 @@ typedef struct {
     bool isSparse; /* If sparse encoding is currently in use */
 
     /* Fields used for sparse representation */
-    struct Node* sparseRegisterList; /* Linked list of set registers */
+    struct Node* sparseRegisterList; /* Linked list of registers */
     struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
     struct Node* nodeCache; /* The last sparse register accessed using _get() */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
@@ -43,8 +42,8 @@ typedef struct Node {
 
 /* ========================== Dense representation ========================= */
 /*
- * Since register values will never exceed 64 we can store them using only
- * 6 bits. This encoding is diagrammed below:
+ * Since register values will never exceed 64 we store them using only 6 bits.
+ * This encoding is diagrammed below:
  *
  *          b0        b1        b3        b4
  *          /         /         /         /
@@ -57,7 +56,6 @@ typedef struct Node {
  *
  *      b = bytes, m = registers
  *
- *
  * The first six bits in b0 are an unused offset. With the exception of byte
  * aligned registers (e.g. m4), registers will have bits in consecutive bytes.
  * For example, the register m2 has bits in b1 and b2. The higher order bits
@@ -66,7 +64,7 @@ typedef struct Node {
  * Getting a register
  * ------------------
  *
- * Suppose we want to get register m2 (e.g. m=2). First we determining the
+ * Suppose we want to get register m2 (e.g. m=2). First we determine the
  * indices of the enclosing bytes:
  *
  *     left byte  = (6*m + 6)/8 - 1                                         (1)
@@ -99,7 +97,7 @@ typedef struct Node {
  *
  *       m2 = "001101"
  *
- * Next, move the left bits into the higher order positions:
+ * Move the left bits into the higher order positions:
  *
  *     +---------+
  *     |1111 0011|   <-- b1
@@ -321,10 +319,10 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
 
 
 int compareNodes(const void* a, const void* b) {
-    struct Node* A = (struct Node*) a;
-    struct Node* B = (struct Node*) b;
 
     int result = -1;
+    struct Node* A = (struct Node*) a;
+    struct Node* B = (struct Node*) b;
 
     if (A->index == B->index) {
         if (A->fsb > B->fsb) {
@@ -346,11 +344,10 @@ int compareNodes(const void* a, const void* b) {
 }
 
 
-/* Updates the linked list using the items in the buffer. */
+/* Updates the register list using the items in the buffer. */
 void flushRegisterBuffer(HyperLogLog* self)
 {
     uint64_t i;
-
     struct Node* node;
     struct Node *current = self->sparseRegisterList;
     struct Node *next = NULL;
@@ -376,7 +373,7 @@ void flushRegisterBuffer(HyperLogLog* self)
             continue;
         }
 
-        /* Try to use the last node */
+        /* Since both lists are sorted try to use the last node */
         if (prev != NULL) {
             current = prev;
         }
@@ -493,14 +490,13 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
         return -1;
     }
 
-    self->size = 1UL << self->p;
-    self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
-    self->histogram[0] = self->size; /* Set the zeroes count */
-
     self->added = 0;
     self->cache = 0;
     self->isCached = 0;
     self->listSize = 0;
+    self->size = 1UL << self->p;
+    self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
+    self->histogram[0] = self->size; /* Set the zeroes count */
 
     if (sparse) {
         self->isSparse = 1;
