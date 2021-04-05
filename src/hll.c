@@ -505,11 +505,14 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
             self->maxListSize = maxSparseListSize;
         }
         else {
-            uint64_t defaultSize = self->size/2;
+            uint64_t defaultSize = self->size/4;
             uint64_t maxDefaultSize = 1 << 20;
 
             if (maxDefaultSize < defaultSize) {
                 self->maxListSize = maxDefaultSize;
+            }
+            else if (defaultSize <= 4) { /* This shouldn't happen, but do something reasonable if it does */
+                self->maxListSize = 2;
             }
             else {
                 self->maxListSize = defaultSize;
