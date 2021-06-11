@@ -17,7 +17,7 @@ Quick start
 
 Install python development libraries. On Ubuntu:
 ```
-sudo apt-get install python-dev
+sudo apt install python-dev
 ```
 
 Install HLL:
@@ -33,6 +33,7 @@ hll = HyperLogLog(10) # use 2^10 registers
 hll.add('some data')
 
 estimate = hll.cardinality()
+print(estimate)
 ```
 
 Documentation
@@ -42,11 +43,14 @@ HyperLogLog objects
 -------------------
 
 HyperLogLogs estimate the cardinality of a multi-set. The estimation power is
-proportional to the number of registers which is controlled by the parameter
-`k` using the formula `2^p`:
+proportional to the number of registers. The number of registers is determined
+by the formula `2^p` where p=12 by default:
 ```
 >>> from hll import HyperLogLog
->>> hll = HyperLogLog(p=3) # Use 2^3=8 registers
+>>> hll = HyperLogLog() # Default to 2^12 registers
+>>> hll.size()
+4096
+>>> hll = HyperLogLog(p=3) # Use 2^3 registers
 >>> hll.size()
 8
 >>> for data in ['one', 'two', 'three', 'four',]:
@@ -54,8 +58,6 @@ proportional to the number of registers which is controlled by the parameter
 >>> hll.cardinality()
 4L
 ```
-The default number of registers, `k=12`, allows for accurate estimation of
-a large range of cardinalities which is suitable for most applications.
 
 HyperLogLogs use a Murmur64A hash. This hash function is fast and has a good
 uniform distribution of bits. The seed to this hash function can be set:
@@ -71,7 +73,7 @@ The hash function can also be called directly:
 393810339
 ```
 
-HyperLogLogs can be merged. This is done by taking the maximum value of the
+HyperLogLogs can be merged. This is done by taking the maximum value of their
 respective registers:
 ```
 >>> red = HyperLogLog(k=4)
@@ -83,9 +85,9 @@ respective registers:
 2
 ```
 
-Individual registers can also be printed:
+Individual registers can be printed:
 ```
->>> for i in range(0, 2**k):
+>>> for i in range(0, 2**4):
         print(hll.get_register(i))
 0
 0
@@ -97,43 +99,37 @@ Individual registers can also be printed:
 Register representation
 -----------------------
 
-When a HyperLogLog is created all the registers are initialized to zero.
-Storing all these zero value registers indvidually is wasteful. Instead a
-sparse representation is used where only non-zero registers are stored in a
-sorted linked list [3]. When this list reaches sufficient size the HyperLogLog
-switches to a dense representation where registers are then stored
-individually using 6 bits.
+Registers are stored using both sparse and dense representation. When a
+`HyperLogLog` is first created the registers are all initialized to zero.
+Storing all these zeroes individually is wasteful. Instead a sorted linked
+list [3] is used to store only registers that have been set (e.g. have a
+non-zero value). When this list reaches sufficient size the `HyperLogLog`
+object will switch to using dense representation where registers are stored
+invidiaully using 6 bits.
 
 Sparse representation can be disabled using the `sparse` flag:
 ```
 >>>> HyperLogLog(p=2, sparse=False)
 ```
 
-The maximum list size, which determines when the switch from sparse to dense
-representation occurs, can be set using `max_list_size`:
+The maximum list size for the sparse register list determines when the
+`HyperLogLog` object switches to dense representation. This can be set
+using `max_list_size`:
 ```
->>>> HyperLogLog(p=2, max_list_size=100)
+>>>> HyperLogLog(p=15, max_list_size=10**6)
 ```
 
-To avoid the expense of traversing the list every time `add()` is called a
-temporary only buffer is used. Items added to the `HyperLogLog` are first
-added to the temporary buffer. When the buffer is full the items are sorted
-and then the registers in the linked list are updated in one pass since both
-the buffer and linked list can be traversed at the same time.
+Traversing the spare register list every time an item is added to the
+`HyperLogLog` to update a register is expensive. A temporary buffer is used
+to defer this operation. Items added to the `HyperLogLog` are first added to
+the temporary buffer. When the buffer is full the items are sorted and then any
+register updates occur. Register updates can be done in one pass of the since
+both the temproary buffer and spare register list are sorted.
 
 The buffer size can be set using `max_buffer_size`:
 ```
->>> HyperLogLog(p=2, max_buffer_size=10)
+>>> HyperLogLog(p=15, max_buffer_size=10**5)
 ```
-Note that some methods will cause the buffer to be cleared if the registers
-are using the sparse representation. This is because these methods require
-access to the current register values. Methods that will clear the buffer
-are: `cardinality()`, `merge()`, and if the HyperLogLog is pickled e.g.
-`pickle.dumps()`.
-
-This can be helpful when the number of registers is very small or when the
-expected cardinality is large enough that it is pointless to engage in
-additional space saving techniques.
 
 License
 =======
@@ -151,5 +147,5 @@ References
     arXiv:1706.07290 [cs], June 2017.
 
 [3] S. Heule, M. Nunkesser, A. Hall. "HyperLogLog in Practice: Algorithimic
-    Engineering of a State of the Art Cartdinality Estimation Algorithm,"
+    Engineering of a State of the Art Cardinality Estimation Algorithm,"
     Proceedings of the EDBT 2013 Conference, ACM, Genoa March 2013.
