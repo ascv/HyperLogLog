@@ -36,15 +36,41 @@ estimate = hll.cardinality()
 print(estimate)
 ```
 
+2.0 Changelog
+=============
+
+Changes:
+
+* Algorithm has been updated to use an 64 bit version [2]. This fixes the
+  spike in relative error when switching from linear counting in the
+  normal HyperLogLog algorithm.
+* Hash function has been updated to the 64 bit Murmur64A function.
+* More efficiently store registers using a combination of sparse and dense
+  representations.
+* Improved method for counting the number of leading zeroes.
+* Changed the return type of `cardinality()` from float to integer.
+* Changed the return logic of `add()`. This method no longer always indicates
+  if a register was updated using its return value. This behavior is only
+  preserved in dense representation. In sparse representation, `add()` always
+  returns `False`.
+* Added check for sufficient memory in `HyperLogLog` constructor.
+* Added `hash()`.
+* Added `_get_register()`. This is an informal private method intended to be
+  used for debugging.
+* Added `_get_meta()`. This is an informal private method used to get the
+  current internal state. It is intended to be used for debugging.
+* Deprecated `registers()`, `set_register()`, `murmur2_hash()`.
+* `HyperLogLog` objects pickled in 1.x and 2.x are not compatible.
+
 Documentation
 =============
 
 HyperLogLog objects
 -------------------
 
-HyperLogLogs estimate the cardinality of a multi-set. The estimation power is
-proportional to the number of registers. The number of registers is determined
-by the formula `2^p` where p=12 by default:
+`HyperLogLog` objects estimate the cardinality of a multi-set. The estimation
+power is proportional to the number of registers. The number of registers is
+determined by the formula `2^p` where `p=12` by default:
 ```
 >>> from hll import HyperLogLog
 >>> hll = HyperLogLog() # Default to 2^12 registers
@@ -59,8 +85,9 @@ by the formula `2^p` where p=12 by default:
 4L
 ```
 
-HyperLogLogs use a Murmur64A hash. This hash function is fast and has a good
-uniform distribution of bits. The seed to this hash function can be set:
+HyperLogLogs use a Murmur64A hash. This function is fast and has a good
+uniform distribution of bits which is necessary for accurate estimations. The
+seed to this hash function can be set in the `HyperLogLog` constructor:
 ```
 >>> hll = HyperLogLog(k=2, seed=123456789)
 >>> hll.seed()
@@ -73,8 +100,8 @@ The hash function can also be called directly:
 393810339
 ```
 
-HyperLogLogs can be merged. This is done by taking the maximum value of their
-respective registers:
+`HyperLogLog` objects can be merged. This is done by taking the maximum value
+of their respective registers:
 ```
 >>> red = HyperLogLog(k=4)
 >>> red.add('hello')
@@ -83,17 +110,6 @@ respective registers:
 >>> red.merge(blue)
 >>> red.cardinality()
 2
-```
-
-Individual registers can be printed:
-```
->>> for i in range(0, 2**4):
-        print(hll.get_register(i))
-0
-0
-3
-0
-4
 ```
 
 Register representation
@@ -109,21 +125,21 @@ invidiaully using 6 bits.
 
 Sparse representation can be disabled using the `sparse` flag:
 ```
->>>> HyperLogLog(p=2, sparse=False)
+>>> HyperLogLog(p=2, sparse=False)
 ```
 
 The maximum list size for the sparse register list determines when the
 `HyperLogLog` object switches to dense representation. This can be set
 using `max_list_size`:
 ```
->>>> HyperLogLog(p=15, max_list_size=10**6)
+>>> HyperLogLog(p=15, max_list_size=10**6)
 ```
 
 Traversing the spare register list every time an item is added to the
 `HyperLogLog` to update a register is expensive. A temporary buffer is used
-to defer this operation. Items added to the `HyperLogLog` are first added to
-the temporary buffer. When the buffer is full the items are sorted and then any
-register updates occur. Register updates can be done in one pass of the since
+instead to defer this operation. Items added to the `HyperLogLog` are first
+added to the temporary buffer. When the buffer is full the items are sorted and
+then any register updates occur. These updates can be done in one pass since
 both the temproary buffer and spare register list are sorted.
 
 The buffer size can be set using `max_buffer_size`:
