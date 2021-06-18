@@ -287,10 +287,15 @@ static inline void setDenseRegister(uint64_t m, uint8_t n, char* regs)
  * Eventually the linked list grows too large to save memory. When this
  * happens the HyperLogLog switches to a dense representation.
  */
-static PyObject*
-getSparseRegister(HyperLogLog* self, uint64_t index)
+
+
+static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
 {
     struct Node *current = NULL;
+
+    if (self->bufferSize > 0) {
+        flushRegisterBuffer(self);
+    }
 
     current = self->sparseRegisterList;
 
@@ -302,18 +307,18 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
     while (current != NULL) {
 
         if (current->index > index) {
-            return Py_BuildValue("k", 0);
+            return 0;
         }
 
         else if (current->index == index) {
             self->nodeCache = current;
-            return Py_BuildValue("k", current->fsb);
+            return current->fsb;
         }
 
         current = current->next;
     }
 
-    return Py_BuildValue("k", 0);
+    return 0;
 }
 
 
@@ -689,15 +694,18 @@ static PyObject*
 HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
 {
     unsigned long index;
+    uint64_t fsb;
 
     if (!PyArg_ParseTuple(args, "k", &index)) return NULL;
     if (!isValidIndex(index, self->size)) return NULL;
 
     if (self->isSparse) {
-        return getSparseRegister(self, index);
+        fsb = getSparseRegister(self, index);
+    } else {
+        fsb = getDenseRegister(index, self->registers);
     }
 
-    return Py_BuildValue("k", getDenseRegister((uint8_t)index, self->registers));
+    return Py_BuildValue("k", fsb);
 }
 
 
@@ -843,7 +851,7 @@ HyperLogLog_reduce(HyperLogLog* self)
 
     state = PyList_New(dumpSize);
 
-    for (int i = 0; i < dumpSize; i++) {
+    for (uint64_t i = 0; i < dumpSize; i++) {
         val = Py_BuildValue("k", 0);
         PyList_SetItem(state, i, val);
     }
