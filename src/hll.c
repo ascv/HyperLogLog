@@ -479,13 +479,14 @@ static int
 HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 {
     static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", "max_sparse_buffer_size", NULL};
-    uint64_t sparse = 0;
     uint64_t maxSparseListSize = 0;
     uint64_t maxSparseBufferSize = 0;
+    int64_t sparse = 1;
 
     self->seed = 314;  /* Chosen arbitrarily */
+    self->p = 12;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i|iikk", kwlist, &self->p, &self->seed, &sparse, &maxSparseListSize, &maxSparseBufferSize)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|iiikk", kwlist, &self->p, &self->seed, &sparse, &maxSparseListSize, &maxSparseBufferSize)) {
         return -1;
     }
 
