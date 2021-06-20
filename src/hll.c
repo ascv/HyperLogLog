@@ -450,7 +450,7 @@ static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
 
 /* Gets the a register value by index */
 static PyObject*
-HyperLogLog__get_register(HyperLogLog* self, PyObject* args)
+HyperLogLog_get_register(HyperLogLog* self, PyObject* args)
 {
     unsigned long index;
     uint64_t fsb;
@@ -783,7 +783,7 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
     self->isCached = 0;
 
     for (uint64_t i = 0; i < self->size; i++) {
-        PyObject* newReg = PyObject_CallMethod(hll, "_get_register", "i", i);
+        PyObject* newReg = PyObject_CallMethod(hll, "get_register", "i", i);
         unsigned long newVal = PyLong_AsUnsignedLong(newReg);
         uint64_t oldVal = getDenseRegister(i, self->registers);
 
@@ -1025,7 +1025,7 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"size", (PyCFunction)HyperLogLog_size, METH_NOARGS,
      "Get the number of registers."
     },
-    {"_get_register", (PyCFunction)HyperLogLog__get_register, METH_VARARGS,
+    {"get_register", (PyCFunction)HyperLogLog_get_register, METH_VARARGS,
      "Get the value of a register."
     },
     {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,

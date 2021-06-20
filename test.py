@@ -52,7 +52,7 @@ class TestHyperLogLogConstructor(unittest.TestCase):
     def test_registers_initialized_to_zero(self):
         hll = HyperLogLog(randint(2, 16))
         for i in range(hll.size()):
-            self.assertEqual(hll._get_register(i), 0)
+            self.assertEqual(hll.get_register(i), 0)
 
     def test_histogram_initialized_with_correct_counts(self):
         k = randint(2, 10)
@@ -94,8 +94,8 @@ class TestMerging(unittest.TestCase):
         hll_c.merge(hll_b)
 
         for i in range(2**k):
-            max_fsb = max(hll_a._get_register(i), hll_b._get_register(i))
-            self.assertEqual(max_fsb, hll_c._get_register(i))
+            max_fsb = max(hll_a.get_register(i), hll_b.get_register(i))
+            self.assertEqual(max_fsb, hll_c.get_register(i))
 
 
 class TestPickling(unittest.TestCase):
