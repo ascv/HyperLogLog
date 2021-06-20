@@ -53,14 +53,14 @@ Changes:
   if a register was updated using its return value. This behavior is only
   preserved in dense representation. In sparse representation, `add()` always
   returns `False`.
-* Added check for sufficient memory in `HyperLogLog` constructor.
-* Added `hash()`.
-* Added `_get_register()`. This is an informal private method intended to be
-  used for debugging.
-* Added `_get_meta()`. This is an informal private method used to get the
-  current internal state. It is intended to be used for debugging.
-* Deprecated `registers()`, `set_register()`, `murmur2_hash()`.
 * `HyperLogLog` objects pickled in 1.x and 2.x are not compatible.
+* Added check for sufficient memory in `HyperLogLog` constructor.
+* Added `get_register()`.
+* Added `hash()`.
+* Added `_get_meta()`.
+* Deprecated `murmur2_hash()`
+* Deprecated `registers()`
+* Deprecated `set_register()`
 
 Documentation
 =============
@@ -89,7 +89,7 @@ HyperLogLogs use a Murmur64A hash. This function is fast and has a good
 uniform distribution of bits which is necessary for accurate estimations. The
 seed to this hash function can be set in the `HyperLogLog` constructor:
 ```
->>> hll = HyperLogLog(k=2, seed=123456789)
+>>> hll = HyperLogLog(p=2, seed=123456789)
 >>> hll.seed()
 12345679
 ```
@@ -100,15 +100,26 @@ The hash function can also be called directly:
 393810339
 ```
 
+Individual registers can be printed:
+```
+>>> for i in range(2**4):
+...     print(hll.get_register(i))
+0
+0
+3
+0
+4
+```
+
 `HyperLogLog` objects can be merged. This is done by taking the maximum value
 of their respective registers:
 ```
->>> red = HyperLogLog(k=4)
->>> red.add('hello')
->>> blue = HyperLogLog(k=4)
->>> blue.add('world')
->>> red.merge(blue)
->>> red.cardinality()
+>>> A = HyperLogLog(p=4)
+>>> A.add('hello')
+>>> B = HyperLogLog(p=4)
+>>> B.add('world')
+>>> A.merge(B)
+>>> A.cardinality()
 2
 ```
 
