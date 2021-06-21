@@ -679,7 +679,7 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", "max_sparse_buffer_size", NULL};
     uint64_t maxSparseListSize = 0;
     uint64_t maxSparseBufferSize = 0;
-    int64_t sparse = 0;
+    int64_t sparse = 1;
 
     self->seed = 314;  /* Chosen arbitrarily */
     self->p = 12;
