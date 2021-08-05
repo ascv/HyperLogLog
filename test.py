@@ -30,12 +30,20 @@ class TestAdd(unittest.TestCase):
             self.fail('failed to add bytes: %s' % ex)
 
     def test_return_value_indicates_register_update(self):
-        changed = self.hll.add('asdf')
+
+        # Dense representation returns change status
+        hll = HyperLogLog(5, sparse=False)
+        changed = hll.add('asdf')
         self.assertTrue(changed)
-        changed = self.hll.add('asdf')
+        changed = hll.add('asdf')
         self.assertFalse(changed)
-        changed = self.hll.add('otherdata')
+        changed = hll.add('otherdata')
         self.assertTrue(changed)
+
+        # Sparse representation does not
+        hll = HyperLogLog(5, sparse=True)
+        changed = hll.add('asdf')
+        self.assertFalse(changed)
 
 
 class TestHyperLogLogConstructor(unittest.TestCase):
