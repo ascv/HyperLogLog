@@ -43,7 +43,7 @@ Changes:
 
 * Algorithm has been updated to use an 64 bit version [2]. This fixes the
   spike in relative error when switching from linear counting in the
-  normal HyperLogLog algorithm.
+  original HyperLogLog algorithm.
 * Hash function has been updated to the 64 bit Murmur64A function.
 * More efficiently store registers using a combination of sparse and dense
   representations.
@@ -54,10 +54,9 @@ Changes:
   preserved in dense representation. In sparse representation, `add()` always
   returns `False`.
 * `HyperLogLog` objects pickled in 1.x and 2.x are not compatible.
-* Added check for sufficient memory in `HyperLogLog` constructor.
-* Added `get_register()`.
-* Added `hash()`.
-* Added `_get_meta()`.
+* Added `get_register()`
+* Added `hash()`
+* Added `_get_meta()`
 * Deprecated `murmur2_hash()`
 * Deprecated `registers()`
 * Deprecated `set_register()`
