@@ -125,13 +125,12 @@ of their respective registers:
 Register representation
 -----------------------
 
-Registers are stored using both sparse and dense representation. When a
-`HyperLogLog` is first created the registers are all initialized to zero.
-Storing all these zeroes individually is wasteful. Instead a sorted linked
-list [3] is used to store only registers that have been set (e.g. have a
-non-zero value). When this list reaches sufficient size the `HyperLogLog`
-object will switch to using dense representation where registers are stored
-invidiaully using 6 bits.
+Registers are stored using both sparse and dense representation. Originally
+all registers are initialized to zero. However storing all these zeroes
+individually is wasteful. Instead a sorted linked list [3] is used to store
+only registers that have been set (e.g. have a non-zero value). When this list
+reaches sufficient size the `HyperLogLog` object will switch to using dense
+representation where registers are stored invidiaully using 6 bits.
 
 Sparse representation can be disabled using the `sparse` flag:
 ```
