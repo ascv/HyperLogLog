@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#define HLL_VERSION "2.0.1"
+#define HLL_VERSION "2.0.2"
 
 #include <math.h>
 #include <Python.h>
@@ -410,6 +410,42 @@ void flushRegisterBuffer(HyperLogLog* self)
     self->bufferSize = 0;
 }
 
+/* Transforms a HyperLogLog from sparse to dense representation. */
+void transformToDense(HyperLogLog* self) {
+    uint64_t bytes = (self->size*6)/8 + 1;
+    self->registers = (char *)calloc(bytes, sizeof(char));
+
+    if (self->registers == NULL) {
+        char* msg = (char*) malloc(128 * sizeof(char));
+        sprintf(msg, "Failed to allocate %lu bytes.", bytes);
+        PyErr_SetString(PyExc_MemoryError, msg);
+        return;
+    }
+
+    flushRegisterBuffer(self);
+
+    struct Node *next = NULL;
+    struct Node *current = self->sparseRegisterList;
+
+    while (current != NULL) {
+        setDenseRegister(current->index, (uint8_t)current->fsb, self->registers);
+        next = current->next;
+        current = next;
+    }
+
+    current = self->sparseRegisterList;
+
+    while (current != NULL) {
+        next = current;
+        current = current->next;
+        free(next);
+    }
+
+    free(self->sparseRegisterBuffer);
+    free(self->nodeCache);
+    self->isSparse = 0;
+}
+
 
 /* Gets the register value at the specified index. */
 static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
@@ -567,39 +603,7 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
 
         /* Switch to dense representation? */
         if (self->listSize >= self->maxListSize) {
-
-            uint64_t bytes = (self->size*6)/8 + 1;
-            self->registers = (char *)calloc(bytes, sizeof(char));
-
-            if (self->registers == NULL) {
-                char* msg = (char*) malloc(128 * sizeof(char));
-                sprintf(msg, "Failed to allocate %lu bytes.", bytes);
-                PyErr_SetString(PyExc_MemoryError, msg);
-                Py_RETURN_FALSE;
-            }
-
-            flushRegisterBuffer(self);
-
-            struct Node *next = NULL;
-            struct Node *current = self->sparseRegisterList;
-
-            while (current != NULL) {
-                setDenseRegister(current->index, (uint8_t)current->fsb, self->registers);
-                next = current->next;
-                current = next;
-            }
-
-            current = self->sparseRegisterList;
-
-            while (current != NULL) {
-                next = current;
-                current = current->next;
-                free(next);
-            }
-
-            free(self->sparseRegisterBuffer);
-            free(self->nodeCache);
-            self->isSparse = 0;
+            transformToDense(self);
         }
 
         self->isCached = 0;
