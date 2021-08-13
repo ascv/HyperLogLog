@@ -45,7 +45,7 @@ typedef struct Node {
  * Since register values will never exceed 64 we store them using only 6 bits.
  * This encoding is diagrammed below:
  *
- *          b0        b1        b3        b4
+ *          b0        b1        b2        b3
  *          /         /         /         /
  *     +-------------------+---------+---------+
  *     |0000 0011|1111 0011|0110 1110|1111 1011|
