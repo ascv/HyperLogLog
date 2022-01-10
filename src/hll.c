@@ -197,7 +197,7 @@ typedef struct Node {
  *    |1110 1110|  <- b2 | nrb
  *    +---------+
  *
- * Since the bytes have been updated, we're done. The final result is shown
+ * The bytes have been updated so we're done. The final result is shown
  * below:
  *
  *         b1         b2
@@ -481,6 +481,28 @@ static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
 }
 
 
+/* Sets a sparse register. This function does not set the register immediately
+ * but instead adds it to the temporary buffer. Register updates will occur
+ * when the buffer is next cleared. */
+static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t fsb)
+{
+    /* Add an element to the buffer if there is room */
+    if (self->bufferSize < self->maxBufferSize) {
+        self->sparseRegisterBuffer[self->bufferSize].index = index;
+        self->sparseRegisterBuffer[self->bufferSize].fsb = fsb;
+        self->bufferSize++;
+    }
+
+    /* Otherwise flush the buffer and then add */
+    else {
+        flushRegisterBuffer(self);
+        self->bufferSize = 1;
+        self->sparseRegisterBuffer[0].index = index;
+        self->sparseRegisterBuffer[0].fsb = fsb;
+    }
+}
+
+
 /* ====================== HyperLogLog object methods ======================= */
 
 
@@ -585,21 +607,7 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     self->added++; /* Increment method call counter */
 
     if (self->isSparse) {
-
-        /* Add an element to the buffer if there is room */
-        if (self->bufferSize < self->maxBufferSize) {
-            self->sparseRegisterBuffer[self->bufferSize].index = index;
-            self->sparseRegisterBuffer[self->bufferSize].fsb = newFsb;
-            self->bufferSize++;
-        }
-
-        /* Otherwise flush the buffer and then add */
-        else {
-            flushRegisterBuffer(self);
-            self->bufferSize = 1;
-            self->sparseRegisterBuffer[0].index = index;
-            self->sparseRegisterBuffer[0].fsb = newFsb;
-        }
+        setSparseRegister(self, index, (uint8_t)newFsb);
 
         /* Switch to dense representation? */
         if (self->listSize >= self->maxListSize) {
