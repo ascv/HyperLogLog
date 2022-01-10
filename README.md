@@ -41,7 +41,7 @@ print(estimate)
 
 Changes:
 
-* Algorithm has been updated to use an 64 bit version [2]. This fixes the
+* Algorithm has been updated to a 64 bit version [2]. This fixes the
   spike in relative error when switching from linear counting in the
   original HyperLogLog algorithm.
 * Hash function has been updated to the 64 bit Murmur64A function.
@@ -144,12 +144,12 @@ using `max_list_size`:
 >>> HyperLogLog(p=15, max_list_size=10**6)
 ```
 
-Traversing the spare register list every time an item is added to the
-`HyperLogLog` to update a register is expensive. A temporary buffer is used
-instead to defer this operation. Items added to the `HyperLogLog` are first
-added to the temporary buffer. When the buffer is full the items are sorted and
-then any register updates occur. These updates can be done in one pass since
-both the temproary buffer and spare register list are sorted.
+Traversing the sparse register list every time an item is added to the
+`HyperLogLog` to update a register is expensive. A temporary buffer is instead
+used to defer this operation. Items added to the `HyperLogLog` are first added
+to the temporary buffer. When the buffer is full the items are sorted and then
+any register updates occur. These updates can be done in one pass since both
+the temproary buffer and sparse register list are sorted.
 
 The buffer size can be set using `max_buffer_size`:
 ```
