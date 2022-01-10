@@ -589,6 +589,43 @@ HyperLogLog_dealloc(HyperLogLog* self)
     Py_TYPE(self)->tp_free((PyObject*) self);
 }
 
+/* Set a HyperLogLog register.*/
+static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
+    self->added++; /* Increment method call counter */
+
+    if (self->isSparse) {
+        setSparseRegister(self, index, (uint8_t)newFsb);
+
+        /* Switch to dense representation? */
+        if (self->listSize >= self->maxListSize) {
+            transformToDense(self);
+        }
+
+        self->isCached = 0;
+    }
+
+    else {
+        uint64_t fsb = getDenseRegister(index, self->registers);
+
+        if (newFsb > fsb) {
+            setDenseRegister(index, (uint8_t)newFsb, self->registers);
+            self->histogram[newFsb] += 1; /* Increment the new count */
+            self->isCached = 0;
+
+            if (self->histogram[fsb] == 0) {
+                self->histogram[0] -= 1;
+            }
+
+            else {
+                self->histogram[fsb] -= 1;
+            }
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
 
 /* Add an element. */
 static PyObject*
@@ -604,40 +641,13 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
-    self->added++; /* Increment method call counter */
+    bool updated = setRegister(self, index, (uint8_t)newFsb);
 
-    if (self->isSparse) {
-        setSparseRegister(self, index, (uint8_t)newFsb);
-
-        /* Switch to dense representation? */
-        if (self->listSize >= self->maxListSize) {
-            transformToDense(self);
-        }
-
-        self->isCached = 0;
+    if (updated) {
+        Py_RETURN_TRUE;
+    } else {
+        Py_RETURN_FALSE;
     }
-
-    else {
-        fsb = getDenseRegister(index, self->registers);
-
-        if (newFsb > fsb) {
-            setDenseRegister(index, (uint8_t)newFsb, self->registers);
-            self->histogram[newFsb] += 1; /* Increment the new count */
-            self->isCached = 0;
-
-            if (self->histogram[fsb] == 0) {
-                self->histogram[0] -= 1;
-            }
-
-            else {
-                self->histogram[fsb] -= 1;
-            }
-
-            Py_RETURN_TRUE;
-        }
-    }
-
-    Py_RETURN_FALSE;
 };
 
 
@@ -802,6 +812,10 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
         uint64_t oldVal = getDenseRegister(i, self->registers);
 
         if (oldVal < newVal) {
+
+            if (self->isSparse) {
+                setDenseRegister(i, newVal, self->registers);
+            }
             setDenseRegister(i, newVal, self->registers);
             self->histogram[newVal] += 1; /* Increment new count */
 
