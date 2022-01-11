@@ -410,6 +410,7 @@ void flushRegisterBuffer(HyperLogLog* self)
     self->bufferSize = 0;
 }
 
+
 /* Transforms a HyperLogLog from sparse to dense representation. */
 void transformToDense(HyperLogLog* self) {
     uint64_t bytes = (self->size*6)/8 + 1;
@@ -448,7 +449,8 @@ void transformToDense(HyperLogLog* self) {
 
 
 /* Gets the register value at the specified index. */
-static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
+static inline uint64_t
+getSparseRegister(HyperLogLog* self, uint64_t index)
 {
     struct Node *current = NULL;
 
@@ -484,8 +486,7 @@ static inline uint64_t getSparseRegister(HyperLogLog* self, uint64_t index)
 /* Sets a sparse register. This function does not set the register immediately
  * but instead adds it to the temporary buffer. Register updates will occur
  * when the buffer is next cleared. */
-static inline void
-setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t fsb)
+static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t fsb)
 {
     /* Add an element to the buffer if there is room */
     if (self->bufferSize < self->maxBufferSize) {
@@ -509,8 +510,7 @@ setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t fsb)
 
 /* Set a HyperLogLog register. This is a convenience function intended to make
  * register updates representation agnostic. */
-static inline bool
-setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
+static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
     self->added++; /* Increment method call counter */
 
     if (self->isSparse) {
@@ -549,8 +549,7 @@ setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
 
 
 /* Gets the a register value by index */
-static PyObject*
-HyperLogLog_get_register(HyperLogLog* self, PyObject* args)
+static PyObject* HyperLogLog_get_register(HyperLogLog* self, PyObject* args)
 {
     unsigned long index;
     uint64_t fsb;
@@ -569,8 +568,7 @@ HyperLogLog_get_register(HyperLogLog* self, PyObject* args)
 
 
 /* Gets a dictionary of internal attributes and their values */
-static PyObject*
-HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
+static PyObject* HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 {
     char version[8];
     sprintf(version, "%u.%u.%u", PY_MAJOR_VERSION, PY_MINOR_VERSION, PY_MICRO_VERSION);
@@ -596,8 +594,7 @@ HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 
 
 /* Gets a histogram of first set bit positions as a list of ints. */
-static PyObject*
-HyperLogLog__histogram(HyperLogLog* self)
+static PyObject* HyperLogLog__histogram(HyperLogLog* self)
 {
     PyObject* histogram = PyList_New(65);
 
@@ -610,8 +607,7 @@ HyperLogLog__histogram(HyperLogLog* self)
 }
 
 
-static void
-HyperLogLog_dealloc(HyperLogLog* self)
+static void HyperLogLog_dealloc(HyperLogLog* self)
 {
     free(self->histogram);
     free(self->registers);
@@ -633,8 +629,7 @@ HyperLogLog_dealloc(HyperLogLog* self)
 
 
 /* Add an element. */
-static PyObject*
-HyperLogLog_add(HyperLogLog* self, PyObject* args)
+static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
 {
     const char* data;
     const uint64_t dataLen;
@@ -657,8 +652,7 @@ HyperLogLog_add(HyperLogLog* self, PyObject* args)
 
 
 /* Get a cardinality estimate */
-static PyObject*
-HyperLogLog_cardinality(HyperLogLog* self)
+static PyObject* HyperLogLog_cardinality(HyperLogLog* self)
 {
     if (self->isCached) {
         return Py_BuildValue("K", self->cache);
@@ -689,8 +683,7 @@ HyperLogLog_cardinality(HyperLogLog* self)
 
 
 /* Get a Murmur64A hash of a string, buffer or bytes object. */
-static PyObject*
-HyperLogLog_hash(HyperLogLog* self, PyObject* args)
+static PyObject* HyperLogLog_hash(HyperLogLog* self, PyObject* args)
 {
     const char* data;
     const uint64_t dataLen;
@@ -702,8 +695,7 @@ HyperLogLog_hash(HyperLogLog* self, PyObject* args)
 }
 
 
-static int
-HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
+static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 {
     static char* kwlist[] = {"p", "seed", "sparse", "max_sparse_list_size", "max_sparse_buffer_size", NULL};
     uint64_t maxSparseListSize = 0;
@@ -787,8 +779,7 @@ HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
  * the other HyperLogLog are unaffected. */
-static PyObject*
-HyperLogLog_merge(HyperLogLog* self, PyObject* args)
+static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 {
     PyObject* hll;
     uint64_t hllSize;
@@ -834,8 +825,7 @@ HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 }
 
 
-static PyObject*
-HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
+static PyObject* HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
 {
     HyperLogLog* self;
     self = (HyperLogLog*)type->tp_alloc(type, 0);
@@ -864,8 +854,7 @@ HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
  *     73-N   register values, if sparse then tuples of the form (register
  *            index, register value) otherwise integers
  */
-static PyObject*
-HyperLogLog_reduce(HyperLogLog* self)
+static PyObject* HyperLogLog_reduce(HyperLogLog* self)
 {
     PyObject* val;
     PyObject* state;
@@ -939,16 +928,14 @@ HyperLogLog_reduce(HyperLogLog* self)
 
 
 /* Gets the seed value used in the Murmur hash. */
-static PyObject*
-HyperLogLog_seed(HyperLogLog* self)
+static PyObject* HyperLogLog_seed(HyperLogLog* self)
 {
     return Py_BuildValue("k", self->seed);
 }
 
 
 /* De-serialization method used to restore pickled objects. */
-static PyObject*
-HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
+static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 {
 
     PyObject* dump;
@@ -1020,8 +1007,7 @@ HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 
 
 /* Gets the number of registers. */
-static PyObject*
-HyperLogLog_size(HyperLogLog* self)
+static PyObject* HyperLogLog_size(HyperLogLog* self)
 {
     return Py_BuildValue("i", self->size);
 }
@@ -1289,5 +1275,3 @@ uint8_t isValidIndex(uint64_t index, uint64_t size)
 
     return valid;
 }
-
-
