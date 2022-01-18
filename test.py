@@ -5,6 +5,7 @@ import unittest
 from HLL import HyperLogLog
 from random import randint
 
+
 class TestAdd(unittest.TestCase):
 
     def setUp(self):
@@ -87,17 +88,58 @@ class TestMerging(unittest.TestCase):
             hll = HyperLogLog(4)
             hll.merge(HyperLogLog(5))
 
-    def test_merging(self):
-        k = randint(2, 8)
+    def test_sparse_x_dense_merge(self):
+        k = 8
+        hll_a = HyperLogLog(k, max_sparse_list_size=128)
+        hll_b = HyperLogLog(k, sparse=False)
+        hll_c = HyperLogLog(k)
 
-        hll_a = HyperLogLog(k)
-        hll_b = HyperLogLog(k)
+        for i in range(32):
+            hll_a.add(str(randint(1, 1024)))
 
-        for i in range(randint(10, 100)):
+        for i in range(1024):
+            hll_b.add(str(randint(1, 1024)))
+
+        hll_c.merge(hll_a)
+        hll_c.merge(hll_b)
+        self.assertFalse(hll_c._get_meta()['is_sparse'])
+
+        for i in range(2**k):
+            max_fsb = max(hll_a.get_register(i), hll_b.get_register(i))
+            self.assertEqual(max_fsb, hll_c.get_register(i))
+
+    def test_sparse_x_sparse_merge(self):
+        k = 8
+        hll_a = HyperLogLog(k, max_sparse_list_size=128)
+        hll_b = HyperLogLog(k, max_sparse_list_size=128)
+        hll_c = HyperLogLog(k, max_sparse_list_size=128)
+
+        for i in range(32):
+            hll_a.add(str(randint(1, 1024)))
+            hll_b.add(str(randint(1, 1024)))
+
+        hll_c.merge(hll_a)
+        hll_c.merge(hll_b)
+
+        self.assertTrue(hll_a._get_meta()['is_sparse'])
+        self.assertTrue(hll_b._get_meta()['is_sparse'])
+        self.assertTrue(hll_c._get_meta()['is_sparse'])
+
+        for i in range(2**k):
+            max_fsb = max(hll_a.get_register(i), hll_b.get_register(i))
+            self.assertEqual(max_fsb, hll_c.get_register(i))
+
+    def test_dense_x_dense_merge(self):
+        k = randint(3, 8)
+
+        hll_a = HyperLogLog(k, sparse=False)
+        hll_b = HyperLogLog(k, sparse=False)
+        hll_c = HyperLogLog(k, sparse=False)
+
+        for i in range(randint(100, 1000)):
             hll_a.add(str(randint(0, 1024)))
             hll_b.add(str(randint(0, 1024)))
 
-        hll_c = HyperLogLog(k)
         hll_c.merge(hll_a)
         hll_c.merge(hll_b)
 
