@@ -439,11 +439,22 @@ void transformToDense(HyperLogLog* self) {
     while (current != NULL) {
         next = current;
         current = current->next;
-        free(next);
+
+        if (next != NULL) {
+            free(next);
+            next = NULL;
+        }
     }
 
-    free(self->sparseRegisterBuffer);
-    free(self->nodeCache);
+    if (self->sparseRegisterBuffer != NULL) {
+        free(self->sparseRegisterBuffer);
+        self->sparseRegisterBuffer = NULL;
+    }
+
+    if (self->nodeCache != NULL) {
+        self->nodeCache = NULL;
+    }
+
     self->isSparse = 0;
 }
 
@@ -722,6 +733,10 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->size = 1UL << self->p;
     self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
     self->histogram[0] = self->size; /* Set the zeroes count */
+    self->nodeCache = NULL;
+    self->registers = NULL;
+    self->sparseRegisterList = NULL;
+    self->sparseRegisterBuffer = NULL;
 
     if (sparse) {
         self->isSparse = 1;
