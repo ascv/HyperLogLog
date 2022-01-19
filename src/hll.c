@@ -414,7 +414,7 @@ void flushRegisterBuffer(HyperLogLog* self)
 /* Transforms a HyperLogLog from sparse to dense representation. */
 void transformToDense(HyperLogLog* self) {
     uint64_t bytes = (self->size*6)/8 + 1;
-    self->registers = (char *)calloc(bytes, sizeof(char));
+    self->registers = (char*)calloc(bytes, sizeof(char));
 
     if (self->registers == NULL) {
         char* msg = (char*) malloc(128 * sizeof(char));
@@ -451,10 +451,7 @@ void transformToDense(HyperLogLog* self) {
         self->sparseRegisterBuffer = NULL;
     }
 
-    if (self->nodeCache != NULL) {
-        self->nodeCache = NULL;
-    }
-
+    self->nodeCache = NULL;
     self->isSparse = 0;
 }
 
