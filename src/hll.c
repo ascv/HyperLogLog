@@ -451,6 +451,7 @@ void transformToDense(HyperLogLog* self) {
         self->sparseRegisterBuffer = NULL;
     }
 
+    self->sparseRegisterList = NULL;
     self->nodeCache = NULL;
     self->isSparse = 0;
 }
@@ -641,7 +642,7 @@ static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
 {
     const uint8_t* data;
     const uint64_t dataLen;
-    uint64_t hash, index, fsb, newFsb;
+    uint64_t hash, index, newFsb;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
     hash = MurmurHash64A((void*)data, dataLen, self->seed);
