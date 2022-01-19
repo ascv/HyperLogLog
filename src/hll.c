@@ -299,16 +299,12 @@ int compareNodes(const void* a, const void* b) {
     if (A->index == B->index) {
         if (A->fsb > B->fsb) {
             result = 1;
-        }
-        else if (A->fsb < B->fsb) {
+        } else if (A->fsb < B->fsb) {
             result = -1;
-        }
-        else {
+        } else {
             result = 0;
         }
-    }
-
-    else if (A->index > B->index) {
+    } else if (A->index > B->index) {
         result = 1;
     }
 
@@ -348,8 +344,7 @@ void flushRegisterBuffer(HyperLogLog* self)
         /* Since both lists are sorted try to use the last node */
         if (prev != NULL) {
             current = prev;
-        }
-        else {
+        } else {
             current = self->sparseRegisterList;
         }
 
@@ -478,9 +473,7 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
 
         if (current->index > index) {
             return 0;
-        }
-
-        else if (current->index == index) {
+        } else if (current->index == index) {
             self->nodeCache = current;
             return current->fsb;
         }
@@ -531,9 +524,7 @@ static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb
         }
 
         self->isCached = 0;
-    }
-
-    else {
+    } else {
         uint64_t fsb = getDenseRegister(index, self->registers);
 
         if (newFsb > fsb) {
@@ -543,9 +534,7 @@ static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb
 
             if (self->histogram[fsb] == 0) {
                 self->histogram[0] -= 1;
-            }
-
-            else {
+            } else {
                 self->histogram[fsb] -= 1;
             }
 
@@ -607,11 +596,11 @@ static PyObject* HyperLogLog__histogram(HyperLogLog* self)
 {
     PyObject* histogram = PyList_New(65);
 
-    for (int i = 0; i < 65; i++)
-    {
+    for (int i = 0; i < 65; i++) {
         PyObject* count = Py_BuildValue("i", self->histogram[i]);
         PyList_SetItem(histogram, i, count);
     }
+
     return histogram;
 }
 
@@ -665,9 +654,7 @@ static PyObject* HyperLogLog_cardinality(HyperLogLog* self)
 {
     if (self->isCached) {
         return Py_BuildValue("K", self->cache);
-    }
-
-    else if (self->isSparse && self->bufferSize > 0) {
+    } else if (self->isSparse && self->bufferSize > 0) {
         flushRegisterBuffer(self);
     }
 
@@ -741,40 +728,34 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 
         if (maxSparseListSize > 0) {
             self->maxListSize = maxSparseListSize;
-        }
-        else {
+        } else {
             uint64_t defaultSize = self->size/4;
             uint64_t maxDefaultSize = 1 << 20;
 
             if (maxDefaultSize < defaultSize) {
                 self->maxListSize = maxDefaultSize;
-            }
-            else if (defaultSize <= 4) { /* This shouldn't happen, but do something reasonable if it does */
+            } else if (defaultSize <= 4) { /* This shouldn't happen, but do something reasonable if it does */
                 self->maxListSize = 2;
-            }
-            else {
+            } else {
                 self->maxListSize = defaultSize;
             }
         }
 
         if (maxSparseBufferSize > 0) {
             self->maxBufferSize = maxSparseBufferSize;
-        }
-        else {
+        } else {
             uint64_t defaultSize = self->maxListSize/2;
             uint64_t maxDefaultSize = 200000;
 
             if (maxDefaultSize < defaultSize) {
                 self->maxBufferSize = maxDefaultSize;
-            }
-            else {
+            } else {
                 self->maxBufferSize = defaultSize;
             }
         }
 
         self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node) * self->maxBufferSize);
-    }
-    else {
+    } else {
         uint64_t bytes = (self->size*6)/8 + 1;
         self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
 
@@ -876,9 +857,7 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
     if (self->isSparse) {
         flushRegisterBuffer(self);
         dumpSize = self->listSize + 65 + 7;
-    }
-
-    else {
+    } else {
         dumpSize = self->size + 65 + 7;
     }
 
@@ -903,9 +882,7 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
         PyList_SetItem(state, i, val);
     }
 
-    /* Serialize sparse representation */
-    if (self->isSparse) {
-
+    if (self->isSparse) { /* Handle sparse representation */
         if (self->nodeCache != NULL) {
             PyList_SetItem(state, 5, Py_BuildValue("k", self->nodeCache->index));
         }
@@ -924,10 +901,7 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
             current = current->next;
             j++;
         }
-    }
-
-    /* Serialize dense representation */
-    else {
+    } else { /* Handle dense representation */
         for (uint64_t i = 72; i < self->size + 72; i++) {
             val = Py_BuildValue("k", getDenseRegister(i - 72, self->registers));
             PyList_SetItem(state, i, val);
@@ -995,8 +969,7 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
             if (i == 65 + 7) {
                 self->sparseRegisterList = node;
                 prev = node;
-            }
-            else {
+            } else {
                 prev->next = node;
             }
 
@@ -1004,8 +977,7 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
                 self->nodeCache = node;
             }
         }
-    }
-    else {
+    } else {
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             valPtr = PyList_GetItem(dump, i);
             val = PyLong_AsUnsignedLong(valPtr);
