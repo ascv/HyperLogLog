@@ -13,7 +13,7 @@
 
 typedef struct {
     PyObject_HEAD
-    char* registers; /* Densely encoded registers */
+    uint8_t* registers; /* Densely encoded registers */
     unsigned short p; /* 2^p = number of registers */
     uint64_t * histogram; /* Register histogram */
     uint64_t seed; /* MurmurHash64A seed */
@@ -36,7 +36,7 @@ typedef struct {
 typedef struct Node {
     struct Node* next;
     uint64_t index;
-    char fsb;
+    uint8_t fsb;
 } Node;
 
 
@@ -215,7 +215,7 @@ typedef struct Node {
 
 
 /* Get register m. */
-static inline uint64_t getDenseRegister(uint64_t m, char* regs)
+static inline uint64_t getDenseRegister(uint64_t m, uint8_t* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -234,7 +234,7 @@ static inline uint64_t getDenseRegister(uint64_t m, char* regs)
 
 
 /* Set register m to n. */
-static inline void setDenseRegister(uint64_t m, uint8_t n, char* regs)
+static inline void setDenseRegister(uint64_t m, uint8_t n, uint8_t* regs)
 {
     uint64_t nBits = 6*m + 6;
     uint64_t bytePos = nBits/8 - 1;
@@ -358,8 +358,8 @@ void flushRegisterBuffer(HyperLogLog* self)
             // Are we updating an existing node?
             if (current->index == node->index) {
                 if (current->fsb < node->fsb) {
-                    self->histogram[(uint8_t)current->fsb]--;
-                    self->histogram[(uint8_t)node->fsb]++;
+                    self->histogram[current->fsb]--;
+                    self->histogram[node->fsb]++;
                     current->fsb = node->fsb;
                 }
                 prev = current;
@@ -414,10 +414,10 @@ void flushRegisterBuffer(HyperLogLog* self)
 /* Transforms a HyperLogLog from sparse to dense representation. */
 void transformToDense(HyperLogLog* self) {
     uint64_t bytes = (self->size*6)/8 + 1;
-    self->registers = (char*)calloc(bytes, sizeof(char));
+    self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
 
     if (self->registers == NULL) {
-        char* msg = (char*) malloc(128 * sizeof(char));
+        char* msg = (char*)malloc(128 * sizeof(char));
         sprintf(msg, "Failed to allocate %lu bytes.", bytes);
         PyErr_SetString(PyExc_MemoryError, msg);
         return;
@@ -429,7 +429,7 @@ void transformToDense(HyperLogLog* self) {
     struct Node *current = self->sparseRegisterList;
 
     while (current != NULL) {
-        setDenseRegister(current->index, (uint8_t)current->fsb, self->registers);
+        setDenseRegister(current->index, current->fsb, self->registers);
         next = current->next;
         current = next;
     }
@@ -639,7 +639,7 @@ static void HyperLogLog_dealloc(HyperLogLog* self)
 /* Add an element. */
 static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
 {
-    const char* data;
+    const uint8_t* data;
     const uint64_t dataLen;
     uint64_t hash, index, fsb, newFsb;
 
@@ -693,7 +693,7 @@ static PyObject* HyperLogLog_cardinality(HyperLogLog* self)
 /* Get a Murmur64A hash of a string, buffer or bytes object. */
 static PyObject* HyperLogLog_hash(HyperLogLog* self, PyObject* args)
 {
-    const char* data;
+    const uint8_t* data;
     const uint64_t dataLen;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
@@ -771,14 +771,14 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
             }
         }
 
-        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node)* self->maxBufferSize);
+        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node) * self->maxBufferSize);
     }
     else {
         uint64_t bytes = (self->size*6)/8 + 1;
-        self->registers = (char *)calloc(bytes, sizeof(char));
+        self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
 
         if (self->registers == NULL) {
-            char* msg = (char*) malloc(128 * sizeof(char));
+            char* msg = (char*)malloc(128 * sizeof(char));
             sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
             PyErr_SetString(PyExc_MemoryError, msg);
             return -1;
@@ -908,7 +908,6 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
         if (self->nodeCache != NULL) {
             PyList_SetItem(state, 5, Py_BuildValue("k", self->nodeCache->index));
         }
-
 
         struct Node *current = NULL;
         PyObject *pyList = NULL;
@@ -1266,7 +1265,7 @@ static inline double tau(double x) {
 
 
 /* Print a the bits in a byte. */
-void printByte(char b)
+void printByte(uint8_t b)
 {
     for (int i = 0; i < 8; i++) {
         printf("%d", !!((b << i) & 0x80));
