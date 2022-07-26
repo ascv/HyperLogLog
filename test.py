@@ -183,6 +183,12 @@ class TestPickling(unittest.TestCase):
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(hll._histogram(), hll2._histogram())
 
+    def test_dense_pickled_registers(self):
+        for hll in self.dense_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            for i in range(hll.size()):
+                self.assertEqual(hll.get_register(i), hll2.get_register(i))
+
     def test_dense_pickled_size(self):
          for hll in self.dense_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
@@ -202,6 +208,12 @@ class TestPickling(unittest.TestCase):
         for hll in self.sparse_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(hll._histogram(), hll2._histogram())
+
+    def test_sparse_pickled_registers(self):
+        for hll in self.sparse_hlls:
+            hll2 = pickle.loads(pickle.dumps(hll))
+            for i in range(hll.size()):
+                self.assertEqual(hll.get_register(i), hll2.get_register(i))
 
     def test_sparse_pickled_size(self):
          for hll in self.sparse_hlls:

@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#define HLL_VERSION "2.0.2"
+#define HLL_VERSION "2.0.3"
 
 #include <math.h>
 #include <Python.h>
@@ -981,7 +981,7 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             valPtr = PyList_GetItem(dump, i);
             val = PyLong_AsUnsignedLong(valPtr);
-            setDenseRegister(i-63, (uint8_t)val, self->registers);
+            setDenseRegister(i - 72, (uint8_t)val, self->registers);
         }
     }
 
