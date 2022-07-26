@@ -2,7 +2,7 @@
 ![Build Status](https://travis-ci.org/ascv/HyperLogLog.png?branch=master)
 (https://travis-ci.org/ascv/HyperLogLog)
 
-v 2.0.1
+v 2.0.3
 
 Overview
 ========
