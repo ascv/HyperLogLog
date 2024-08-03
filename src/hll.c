@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#define HLL_VERSION "2.0.3"
+#define HLL_VERSION "2.0.4"
 
 #include <math.h>
 #include <Python.h>
@@ -775,20 +775,20 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
  * the other HyperLogLog are unaffected. */
 static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 {
-    PyObject* hll;
-    uint64_t hllSize;
+    PyObject* otherHLL;
+    uint64_t otherSize;
 
-    if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
+    if (!PyArg_ParseTuple(args, "O", &otherHLL)) return NULL;
 
-    PyObject* size = PyObject_CallMethod(hll, "size", NULL);
+    PyObject* size = PyObject_CallMethod(otherHLL, "size", NULL);
 
     #if PY_MAJOR_VERSION >= 3
-        hllSize = PyLong_AsLong(size);
+        otherSize = PyLong_AsLong(size);
     #else
-        hllSize = PyInt_AS_LONG(size);
+        otherSize = PyInt_AS_LONG(size);
     #endif
 
-    if (hllSize > self->size) {
+    if (otherSize > self->size) {
         PyErr_SetString(PyExc_ValueError, "Unequal sizes");
         return NULL;
     }
@@ -797,21 +797,25 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
     self->isCached = 0;
 
     for (uint64_t i = 0; i < self->size; i++) {
-        PyObject* newReg = PyObject_CallMethod(hll, "get_register", "i", i);
-        unsigned long newVal = PyLong_AsUnsignedLong(newReg);
+        PyObject* otherReg = PyObject_CallMethod(otherHLL, "get_register", "i", i);
+        unsigned long newVal = PyLong_AsUnsignedLong(otherReg);
         uint64_t oldVal;
 
         if (self->isSparse) {
+            printf("%ld: (self) is sparse\n", i);
             oldVal = getSparseRegister(self, i);
         } else {
             oldVal = getDenseRegister(i, self->registers);
         }
 
+        printf("%ld: (self) %d vs %d\n", i, (uint8_t)oldVal, (uint8_t)newVal);
+
         if (oldVal < newVal) {
+            printf("%ld: setting register to %d (other)\n", i, (uint8_t)newVal);
             setRegister(self, i, (uint8_t)newVal);
         }
 
-        Py_DECREF(newReg);
+        Py_DECREF(otherReg);
     }
 
     Py_INCREF(Py_None);
