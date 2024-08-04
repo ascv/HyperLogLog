@@ -950,8 +950,6 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
         struct Node* prev = NULL;
         PyObject *lst = NULL;
 
-        self->sparseRegisterList = node;
-
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             lst = PyList_GetItem(dump, i);
             index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
