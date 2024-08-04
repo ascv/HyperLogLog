@@ -967,6 +967,7 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
                 prev = node;
             } else {
                 prev->next = node;
+                prev = node;
             }
 
             if (node->index == nodeCacheIndex) {
