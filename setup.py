@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 setup(
     name='HLL',
     version='2.0.3',
-    description='HyperLogLog implementation in C for python.',
+    description='Fast HyperLogLog',
     author='Joshua Andersen',
     author_email='josh.h.andersen@gmail.com',
     maintainer='Joshua Andersen',
@@ -16,9 +16,12 @@ setup(
     license='MIT',
     long_description=\
 """
+Fast HyperLogLog for Python.
+
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
 cardinality of extraordinarily large data sets. This library implements a 64
-bit variant [2] written in C that uses a MurmurHash64A hash function.
+bit variant [2] for Python, written in C, that uses a MurmurHash64A hash
+function.
 
 [1] Flajolet, Philippe; Fusy, Eric; Gandouet, Olivier; Meunier, Frederic
 (2007). "Hyperloglog: The analysis of a near-optimal cardinality estimation
