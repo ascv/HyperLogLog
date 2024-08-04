@@ -465,12 +465,9 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
     current = self->sparseRegisterList;
 
     /* Can we used the cache? */
-    //if (self->nodeCache != NULL && self->nodeCache->index <= index) {
-    //    printf("+---getSparseRegister: using cache!!\n");
-    //    printf("+---getSparseRegister: cache index %lu\n", self->nodeCache->index);
-    //    printf("+---getSparseRegister: cache fsb %u\n", self->nodeCache->fsb);
-    //    current = self->nodeCache;
-    //}
+    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
+        current = self->nodeCache;
+    }
 
     while (current != NULL) {
         if (current->index > index) {
@@ -812,11 +809,6 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
             setRegister(self, i, (uint8_t)newVal);
         }
     }
-
-    //if (self->isSparse) {
-    //    printf("flushing!!!!!!!!!!!!!!!!!!!!!!!\n");
-    //    flushRegisterBuffer(self);
-    //}
 
     Py_INCREF(Py_None);
     return Py_None;
