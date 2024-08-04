@@ -12,7 +12,7 @@ setup(
         Extension('HLL', ['src/hll.c', 'lib/murmur2.c', ]),
     ],
     headers=['src/hll.h', 'lib/murmur2.h', ],
-    keywords=['HyperLogLog', 'Hyper LogLog', 'Hyper Log Log', 'LogLog', 'Log Log', 'cardinality', 'counting', 'sketch'],
+    keywords=['algorithm', 'approximate counting', 'big data', 'big data', 'cardinality', 'cardinality estimate', 'counting', 'data analysis', 'data processing', 'data science', 'data sketching', 'efficient computation', 'estimating cardinality', 'fast', 'frequency estimation', 'hyper log log', 'hyper loglog', 'hyperloglog', 'large-scale data', 'log log', 'loglog', 'memory efficient', 'probability estimate', 'probability sketch', 'probablistic counting', 'probablistic data structures', 'real-time analytics', 'scalable', 'set cardinality', 'set operations', 'sketch', 'statistical analysis', 'streaming algorithms', 'streaming algorithms', 'unique count', 'unique element counting'],
     license='MIT',
     long_description=\
 """
