@@ -782,7 +782,7 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 
     otherSize = otherHLL->size;
 
-    if (otherSize > self->size) {
+    if (otherSize != self->size) {
         PyErr_SetString(PyExc_ValueError, "Unequal sizes");
         return NULL;
     }
