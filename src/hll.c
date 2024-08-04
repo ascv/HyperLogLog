@@ -456,6 +456,8 @@ void transformToDense(HyperLogLog* self) {
 static inline uint64_t
 getSparseRegister(HyperLogLog* self, uint64_t index)
 {
+    printf("+--getSparseRegister()\n");
+    printf("+----getSparseRegister: trying to get %lu\n", index);
     struct Node *current = NULL;
 
     if (self->bufferSize > 0) {
@@ -465,22 +467,27 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
     current = self->sparseRegisterList;
 
     /* Can we used the cache? */
-    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
-        current = self->nodeCache;
-    }
+    //if (self->nodeCache != NULL && self->nodeCache->index <= index) {
+    //    printf("+---getSparseRegister: using cache!!\n");
+    //    printf("+---getSparseRegister: cache index %lu\n", self->nodeCache->index);
+    //    printf("+---getSparseRegister: cache fsb %u\n", self->nodeCache->fsb);
+    //    current = self->nodeCache;
+    //}
 
     while (current != NULL) {
-
         if (current->index > index) {
+            printf("+----getSparseRegister: current index %lu > index %lu returning 0..\n", current->index, index);
             return 0;
         } else if (current->index == index) {
             self->nodeCache = current;
+            printf("+----getSparseRegister: returning %u\n", current->fsb);
             return current->fsb;
         }
 
         current = current->next;
     }
 
+    printf("+----getSparseRegister: returning zero\n");
     return 0;
 }
 
@@ -490,8 +497,10 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
  * when the buffer is next cleared. */
 static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t fsb)
 {
+    printf("+------setSparseRegister()\n");
     /* Add an element to the buffer if there is room */
     if (self->bufferSize < self->maxBufferSize) {
+        printf("+--------setSparseRegister(): adding register %lu,%u to buffer\n", index, fsb);
         self->sparseRegisterBuffer[self->bufferSize].index = index;
         self->sparseRegisterBuffer[self->bufferSize].fsb = fsb;
         self->bufferSize++;
@@ -499,6 +508,7 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
 
     /* Otherwise flush the buffer and then add */
     else {
+        printf("+--------setSparseRegister(): flushing buffer\n");
         flushRegisterBuffer(self);
         self->bufferSize = 1;
         self->sparseRegisterBuffer[0].index = index;
@@ -775,48 +785,54 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
  * the other HyperLogLog are unaffected. */
 static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 {
-    PyObject* otherHLL;
+    HyperLogLog* otherHLL;
     uint64_t otherSize;
 
     if (!PyArg_ParseTuple(args, "O", &otherHLL)) return NULL;
 
-    PyObject* size = PyObject_CallMethod(otherHLL, "size", NULL);
+    printf("------------------- merge() ----------------------\n");
+    printf("merging: other size is %lu\n", otherSize);
+    printf("merging: other sparse %u\n", otherHLL->isSparse);
+    otherSize = otherHLL->size;
 
-    #if PY_MAJOR_VERSION >= 3
-        otherSize = PyLong_AsLong(size);
-    #else
-        otherSize = PyInt_AS_LONG(size);
-    #endif
-
+    //TODO: fix this bug
     if (otherSize > self->size) {
         PyErr_SetString(PyExc_ValueError, "Unequal sizes");
         return NULL;
     }
 
-    Py_DECREF(size);
     self->isCached = 0;
 
     for (uint64_t i = 0; i < self->size; i++) {
-        PyObject* otherReg = PyObject_CallMethod(otherHLL, "get_register", "i", i);
-        unsigned long newVal = PyLong_AsUnsignedLong(otherReg);
+        uint64_t newVal;
         uint64_t oldVal;
 
         if (self->isSparse) {
-            printf("%ld: (self) is sparse\n", i);
+            printf("(self) merging: getting sparse register %lu\n", i);
             oldVal = getSparseRegister(self, i);
         } else {
             oldVal = getDenseRegister(i, self->registers);
         }
 
-        printf("%ld: (self) %d vs %d\n", i, (uint8_t)oldVal, (uint8_t)newVal);
-
-        if (oldVal < newVal) {
-            printf("%ld: setting register to %d (other)\n", i, (uint8_t)newVal);
-            setRegister(self, i, (uint8_t)newVal);
+        if (otherHLL->isSparse) {
+            printf("(other) merging: getting sparse register %lu\n", i);
+            newVal = getSparseRegister(otherHLL, i);
+        } else {
+            newVal = getDenseRegister(i, otherHLL->registers);
         }
 
-        Py_DECREF(otherReg);
+        printf("(self) %d vs (other) %d merging: register %lu\n", (uint8_t)oldVal, (uint8_t)newVal, i);
+
+        if (oldVal < newVal) {
+            printf("(other) merging: setting register %ld to %d\n", i, (uint8_t)newVal);
+            setRegister(self, i, (uint8_t)newVal);
+        }
     }
+
+    //if (self->isSparse) {
+    //    printf("flushing!!!!!!!!!!!!!!!!!!!!!!!\n");
+    //    flushRegisterBuffer(self);
+    //}
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -861,8 +877,10 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
     if (self->isSparse) {
         flushRegisterBuffer(self);
         dumpSize = self->listSize + 65 + 7;
+        printf("reducing: dumpSize (sparse): %li\n", dumpSize);
     } else {
         dumpSize = self->size + 65 + 7;
+        printf("reducing: dumpSize (dense): %li\n", dumpSize);
     }
 
     state = PyList_New(dumpSize);
@@ -927,7 +945,6 @@ static PyObject* HyperLogLog_seed(HyperLogLog* self)
 /* De-serialization method used to restore pickled objects. */
 static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
 {
-
     PyObject* dump;
     PyObject* valPtr;
     unsigned long val;
@@ -945,6 +962,8 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     uint64_t dumpSize = self->isSparse ? self->listSize : self->size;
     dumpSize += 65 + 7;
 
+    printf("setting state: dumpSize %li\n", dumpSize);
+
     for (int i = 7; i < 65 + 7; i++) {
         valPtr = PyList_GetItem(dump, i);
         val = PyLong_AsUnsignedLong(valPtr);
@@ -958,12 +977,11 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
         struct Node* prev = NULL;
         PyObject *lst = NULL;
 
-        self->sparseRegisterList = node;
-
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             lst = PyList_GetItem(dump, i);
             index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
             fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
+            printf("setting state on (sparse) node: index %lu fsb %lu\n", index, fsb);
 
             node = (struct Node*)malloc(sizeof(struct Node));
             node->index = index;
@@ -971,20 +989,25 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
             node->next = NULL;
 
             if (i == 65 + 7) {
+                printf("setting state (sparse) node: set head node\n");
                 self->sparseRegisterList = node;
                 prev = node;
             } else {
+                printf("setting state (sparse) node: pointing back to %lu\n", prev->index);
                 prev->next = node;
+                prev = node; // FIXED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
 
             if (node->index == nodeCacheIndex) {
                 self->nodeCache = node;
+                printf("setting state (sparse): set node cache\n");
             }
         }
     } else {
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
             valPtr = PyList_GetItem(dump, i);
             val = PyLong_AsUnsignedLong(valPtr);
+            printf("setting state (dense): index %lu fsb %lu\n", i-72, val);
             setDenseRegister(i - 72, (uint8_t)val, self->registers);
         }
     }
