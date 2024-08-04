@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 setup(
     name='HLL',
-    version='2.0.3',
+    version='2.0.4',
     description='Fast Python HyperLogLog',
     author='Joshua Andersen',
     author_email='josh.h.andersen@gmail.com',
