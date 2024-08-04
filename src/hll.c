@@ -775,30 +775,22 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
  * the other HyperLogLog are unaffected. */
 static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 {
-    PyObject* hll;
-    uint64_t hllSize;
+    HyperLogLog* otherHLL;
+    uint64_t otherSize;
 
-    if (!PyArg_ParseTuple(args, "O", &hll)) return NULL;
+    if (!PyArg_ParseTuple(args, "O", &otherHLL)) return NULL;
 
-    PyObject* size = PyObject_CallMethod(hll, "size", NULL);
+    otherSize = otherHLL->size;
 
-    #if PY_MAJOR_VERSION >= 3
-        hllSize = PyLong_AsLong(size);
-    #else
-        hllSize = PyInt_AS_LONG(size);
-    #endif
-
-    if (hllSize > self->size) {
+    if (otherSize > self->size) {
         PyErr_SetString(PyExc_ValueError, "Unequal sizes");
         return NULL;
     }
 
-    Py_DECREF(size);
     self->isCached = 0;
 
     for (uint64_t i = 0; i < self->size; i++) {
-        PyObject* newReg = PyObject_CallMethod(hll, "get_register", "i", i);
-        unsigned long newVal = PyLong_AsUnsignedLong(newReg);
+        uint64_t newVal;
         uint64_t oldVal;
 
         if (self->isSparse) {
@@ -807,11 +799,15 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
             oldVal = getDenseRegister(i, self->registers);
         }
 
+        if (otherHLL->isSparse) {
+            newVal = getSparseRegister(otherHLL, i);
+        } else {
+            newVal = getDenseRegister(i, otherHLL->registers);
+        }
+
         if (oldVal < newVal) {
             setRegister(self, i, (uint8_t)newVal);
         }
-
-        Py_DECREF(newReg);
     }
 
     Py_INCREF(Py_None);
