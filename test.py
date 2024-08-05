@@ -1,4 +1,5 @@
 import pickle
+import random
 import sys
 import unittest
 
@@ -168,10 +169,47 @@ class TestPickling(unittest.TestCase):
 
         self.sparse_hlls = hlls
 
+    def _get_union_precision(self, pickle_it=False):
+        """
+        Helper function for testing pickle-merge workflow. See issue #46.
+        """
+
     def test_dense_pickled_cardinality(self):
         for hll in self.dense_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(hll.cardinality(), hll2.cardinality())
+
+    def test_dense_pickle_merge_workflow(self):
+        """
+        Test repeated pickle dumps, pickle loads, and merging for dense HyperLogLogs.
+
+        See:
+            https://github.com/ascv/HyperLogLog/issues/46
+        """
+        random.seed(0)
+        p = 8
+        seed = 0
+
+        merge_hll = HyperLogLog(p=p, seed=seed, sparse=False)
+        control_hll = HyperLogLog(p=p, seed=seed, sparse=False)
+        merge_count = 1024
+        possible_values = [str(i) for i in range(2**16)]
+        chosen_values = set()
+
+        for _ in range(merge_count):
+            tmp_hll = HyperLogLog(p=p, seed=seed, sparse=False)
+            random_values = random.sample(possible_values, k=random.randint(0, 2**8))
+            chosen_values.update(random_values)
+
+            for val in random_values:
+                tmp_hll.add(val)
+                control_hll.add(val)
+
+            tmp_hll = pickle.loads(pickle.dumps(tmp_hll))
+            merge_hll.merge(tmp_hll)
+
+        random.seed(None)
+        self.assertEqual(merge_hll.cardinality(), control_hll.cardinality())
 
     def test_dense_pickled_seed(self):
         for hll in self.dense_hlls:
@@ -198,6 +236,38 @@ class TestPickling(unittest.TestCase):
         for hll in self.sparse_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(hll.cardinality(), hll2.cardinality())
+
+    def test_sparse_pickle_merge_workflow(self):
+        """
+        Test repeated pickle dumps, pickle loads, and merging for sparse HyperLogLogs.
+
+        See:
+            https://github.com/ascv/HyperLogLog/issues/46
+        """
+        random.seed(0)
+        p = 8
+        seed = 0
+
+        merge_hll = HyperLogLog(p=p, seed=seed, sparse=True)
+        control_hll = HyperLogLog(p=p, seed=seed, sparse=True)
+        merge_count = 1024
+        possible_values = [str(i) for i in range(2**16)]
+        chosen_values = set()
+
+        for _ in range(merge_count):
+            tmp_hll = HyperLogLog(p=p, seed=seed, sparse=True)
+            random_values = random.sample(possible_values, k=random.randint(0, 2**8))
+            chosen_values.update(random_values)
+
+            for val in random_values:
+                tmp_hll.add(val)
+                control_hll.add(val)
+
+            tmp_hll = pickle.loads(pickle.dumps(tmp_hll))
+            merge_hll.merge(tmp_hll)
+
+        random.seed(None)
+        self.assertEqual(merge_hll.cardinality(), control_hll.cardinality())
 
     def test_sparse_pickled_seed(self):
         for hll in self.sparse_hlls:
