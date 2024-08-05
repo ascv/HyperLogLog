@@ -33,6 +33,17 @@ estimate = hll.cardinality()
 print(estimate)
 ```
 
+2.1 Changelog
+=============
+
+Deprecation notice: this is the last supported version for Python 2.7.x.
+
+Changes:
+
+* Fix bug where HyperLogLogs of unequal sizes could be merged.
+* Fix bug causing cardinality estimates to be off when repeatedly merging
+  sparse HyperLogLogs loaded from a pickle dump.
+
 2.0 Changelog
 =============
 
