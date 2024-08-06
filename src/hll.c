@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#define HLL_VERSION "2.1.0"
+#define HLL_VERSION "2.1.4"
 
 #include <math.h>
 #include <Python.h>
