@@ -1232,7 +1232,7 @@ static inline double tau(double x) {
 }
 
 
-/* Print a the bits in a byte. */
+/* Print the bits in a byte. */
 void printByte(uint8_t b)
 {
     for (int i = 0; i < 8; i++) {
