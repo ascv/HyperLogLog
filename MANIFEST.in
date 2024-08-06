@@ -1,0 +1,6 @@
+include src/hll.c
+include src/hll.h
+include lib/murmur2.c
+include lib/murmur2.h
+include HLL/__init__.py
+include README.md
