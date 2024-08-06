@@ -1,18 +1,18 @@
 
-v 2.1.5
+v 2.1.7
 
 Overview
 ========
 
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
-cardinality of extraordinarily large data sets. This module is written in C
-for python >= 3.6 and python 2.7.x. It implements a 64 bit version [2] of
-HyperLogLog using a Murmur64A hash.
+cardinality of extraordinarily large datasets. This module is written in C
+for Python >= 3.6 and Python 2.7.x. It implements a 64 bit version of
+HyperLogLog [2] using a Murmur64A hash.
 
 Quick start
 ===========
 
-Install python development libraries. On Ubuntu:
+Install Python development libraries. On Ubuntu:
 ```
 sudo apt install python-dev
 ```
@@ -36,9 +36,7 @@ print(estimate)
 2.1 Changelog
 =============
 
-Deprecation notice: this is the last supported version for Python 2.7.x.
-
-Changes:
+**Deprecation notice**: this is the last supported version for Python 2.7.x.
 
 * Fix bug where HyperLogLogs of unequal sizes could be merged.
 * Fix bug causing cardinality estimates to be off when repeatedly merging
@@ -46,8 +44,6 @@ Changes:
 
 2.0 Changelog
 =============
-
-Changes:
 
 * Algorithm has been updated to a 64 bit version [2]. This fixes the
   spike in relative error when switching from linear counting in the
@@ -75,15 +71,18 @@ Documentation
 HyperLogLog objects
 -------------------
 
-`HyperLogLog` objects estimate the cardinality of a multi-set. The estimation
-power is proportional to the number of registers. The number of registers is
-determined by the formula `2^p` where `p=12` by default:
+`HyperLogLog` objects implement a 64 bit HyperLogLog algorithm [2]. They can
+be used to estimate the cardinality of very large datasets. The estimation
+accuracy is proportional to the number of registers. Using more registers
+increases the accuracy and using less registers decreases the accuracy. The
+number of registers is set in powers of 2 using the parameter `p` and defaults
+to `p=12` or `2^12` registers.
 ```
 >>> from hll import HyperLogLog
 >>> hll = HyperLogLog() # Default to 2^12 registers
 >>> hll.size()
 4096
->>> hll = HyperLogLog(p=3) # Use 2^3 registers
+>>> hll = HyperLogLog(3) # Use 2^3 registers
 >>> hll.size()
 8
 >>> for data in ['one', 'two', 'three', 'four',]:
