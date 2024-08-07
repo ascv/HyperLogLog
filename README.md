@@ -97,7 +97,7 @@ seed to this hash function can be set in the `HyperLogLog` constructor:
 ```
 >>> hll = HyperLogLog(p=2, seed=123456789)
 >>> hll.seed()
-12345679
+123456789
 ```
 
 The hash function can also be called directly:
