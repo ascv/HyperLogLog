@@ -169,11 +169,6 @@ class TestPickling(unittest.TestCase):
 
         self.sparse_hlls = hlls
 
-    def _get_union_precision(self, pickle_it=False):
-        """
-        Helper function for testing pickle-merge workflow. See issue #46.
-        """
-
     def test_dense_pickled_cardinality(self):
         for hll in self.dense_hlls:
             hll2 = pickle.loads(pickle.dumps(hll))
