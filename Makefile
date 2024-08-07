@@ -8,9 +8,9 @@ install:
 	python setup.py install
 remove:
 	python setup.py uninstall HLL
-test_pip:
-	pip install .
 sdist:
 	python setup.py sdist
+test_sdist:
+	pip install .
 upload:
 	twine upload dist/*
