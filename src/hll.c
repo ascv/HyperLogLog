@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#define HLL_VERSION "2.1.7"
+#define HLL_VERSION "2.2.0"
 
 #include <math.h>
 #include <Python.h>
@@ -357,11 +357,11 @@ void flushRegisterBuffer(HyperLogLog* self)
                     self->histogram[node->fsb]++;
                     current->fsb = node->fsb;
                 }
+
                 prev = current;
 
                 /* We don't need the new node */
                 free(node);
-
                 break;
             }
 
@@ -1037,91 +1037,66 @@ static PyMethodDef HyperLogLog_methods[] = {
 
 static PyTypeObject HyperLogLogType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "HLL.HyperLogLog",               /* tp_name */
-    sizeof(HyperLogLog),             /* tp_basicsize */
-    0,                               /* tp_itemsize */
-    (destructor)HyperLogLog_dealloc, /* tp_dealloc */
-    0,                               /* tp_print */
-    0,                               /* tp_getattr */
-    0,                               /* tp_setattr */
-    0,                               /* tp_compare */
-    0,                               /* tp_repr */
-    0,                               /* tp_as_number */
-    0,                               /* tp_as_sequence */
-    0,                               /* tp_as_mapping */
-    0,                               /* tp_hash */
-    0,                               /* tp_call */
-    0,                               /* tp_str */
-    0,                               /* tp_getattro */
-    0,                               /* tp_setattro */
-    0,                               /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT |
-        Py_TPFLAGS_BASETYPE,         /* tp_flags */
-    "HyperLogLog object",            /* tp_doc */
-    0,                               /* tp_traverse */
-    0,                               /* tp_clear */
-    0,                               /* tp_richcompare */
-    0,                               /* tp_weaklistoffset */
-    0,                               /* tp_iter */
-    0,                               /* tp_iternext */
-    HyperLogLog_methods,             /* tp_methods */
-    HyperLogLog_members,             /* tp_members */
-    0,                               /* tp_getset */
-    0,                               /* tp_base */
-    0,                               /* tp_dict */
-    0,                               /* tp_descr_get */
-    0,                               /* tp_descr_set */
-    0,                               /* tp_dictoffset */
-    (initproc)HyperLogLog_init,      /* tp_init */
-    0,                               /* tp_alloc */
-    HyperLogLog_new,                 /* tp_new */
+    "HLL.HyperLogLog",                        /* tp_name */
+    sizeof(HyperLogLog),                      /* tp_basicsize */
+    0,                                        /* tp_itemsize */
+    (destructor)HyperLogLog_dealloc,          /* tp_dealloc */
+    0,                                        /* tp_print */
+    0,                                        /* tp_getattr */
+    0,                                        /* tp_setattr */
+    0,                                        /* tp_compare */
+    0,                                        /* tp_repr */
+    0,                                        /* tp_as_number */
+    0,                                        /* tp_as_sequence */
+    0,                                        /* tp_as_mapping */
+    0,                                        /* tp_hash */
+    0,                                        /* tp_call */
+    0,                                        /* tp_str */
+    0,                                        /* tp_getattro */
+    0,                                        /* tp_setattro */
+    0,                                        /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+    "HyperLogLog object",                     /* tp_doc */
+    0,                                        /* tp_traverse */
+    0,                                        /* tp_clear */
+    0,                                        /* tp_richcompare */
+    0,                                        /* tp_weaklistoffset */
+    0,                                        /* tp_iter */
+    0,                                        /* tp_iternext */
+    HyperLogLog_methods,                      /* tp_methods */
+    HyperLogLog_members,                      /* tp_members */
+    0,                                        /* tp_getset */
+    0,                                        /* tp_base */
+    0,                                        /* tp_dict */
+    0,                                        /* tp_descr_get */
+    0,                                        /* tp_descr_set */
+    0,                                        /* tp_dictoffset */
+    (initproc)HyperLogLog_init,               /* tp_init */
+    0,                                        /* tp_alloc */
+    HyperLogLog_new,                          /* tp_new */
 };
 
 
-#if PY_MAJOR_VERSION >= 3
-    static PyModuleDef HyperLogLogmodule = {
-        PyModuleDef_HEAD_INIT,
-        "HyperLogLog",
-        "A space efficient cardinality estimator.",
-        -1,
-        NULL, NULL, NULL, NULL, NULL
-    };
-#else
-    static PyMethodDef module_methods[] = {
-        {NULL}  /* Sentinel */
-    };
-#endif
+static PyModuleDef HyperLogLogmodule = {
+    PyModuleDef_HEAD_INIT,
+    "HyperLogLog",
+    "A space efficient cardinality estimator.",
+    -1,
+    NULL, NULL, NULL, NULL, NULL
+};
 
-#if PY_MAJOR_VERSION >=3
-    PyMODINIT_FUNC
-    PyInit_HLL(void)
-#else
-    /* declarations for DLL import or export */
-    #ifndef PyMODINIT_FUNC
-        #define PyMODINIT_FUNC void
-    #endif
-    PyMODINIT_FUNC initHLL(void)
-#endif
-
+PyMODINIT_FUNC
+PyInit_HLL(void)
 {
     PyObject* m;
-    #if PY_MAJOR_VERSION >= 3
-        if (PyType_Ready(&HyperLogLogType) < 0) return NULL;
-        m = PyModule_Create(&HyperLogLogmodule);
-        if (m == NULL) return NULL;
-    #else
-        if (PyType_Ready(&HyperLogLogType) < 0) return;
-        char* info = "HyperLogLog cardinality estimator.";
-        m = Py_InitModule3("HLL", module_methods, info);
-        if (m == NULL) return;
-    #endif
+    if (PyType_Ready(&HyperLogLogType) < 0) return NULL;
+    m = PyModule_Create(&HyperLogLogmodule);
+    if (m == NULL) return NULL;
 
     Py_INCREF(&HyperLogLogType);
     PyModule_AddObject(m, "HyperLogLog", (PyObject*)&HyperLogLogType);
 
-    #if PY_MAJOR_VERSION >= 3
-        return m;
-    #endif
+    return m;
 }
 
 

@@ -18,13 +18,6 @@ class TestAdd(unittest.TestCase):
         except Exception as ex:
             self.fail('failed to add string: %s' % ex)
 
-    @unittest.skipIf(sys.version_info[0] > 2, 'buffer is deprecated in python 3.x')
-    def test_add_buffer(self):
-        try:
-            self.hll.add(buffer('some characters'))
-        except Exception as ex:
-            self.fail('failed to add buffer: %s' % ex)
-
     def test_add_bytes(self):
         try:
             self.hll.add(b'some other characters')

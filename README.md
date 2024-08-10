@@ -1,6 +1,3 @@
-
-v 2.1.7
-
 Overview
 ========
 
@@ -9,10 +6,12 @@ cardinality of extraordinarily large datasets. This module is written in C
 for Python >= 3.6 and Python 2.7.x. It implements a 64 bit version of
 HyperLogLog [2] using a Murmur64A hash.
 
+
 Quick start
 ===========
 
-Install Python development libraries. On Ubuntu:
+Install Python development libraries. This step will depend on your OS. On
+Ubuntu:
 ```
 sudo apt install python-dev
 ```
@@ -32,6 +31,11 @@ hll.add('some data')
 estimate = hll.cardinality()
 print(estimate)
 ```
+
+2.2 Changelog
+=============
+
+* Remove support for Python 2.7.
 
 2.1 Changelog
 =============
