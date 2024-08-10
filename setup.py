@@ -12,7 +12,7 @@ module = Extension(
 
 setup(
     name='HLL',
-    version='2.1.7',
+    version='2.2.0',
     description='Fast HyperLogLog for Python',
     author='Joshua Andersen',
     author_email='josh.h.andersen@gmail.com',
