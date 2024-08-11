@@ -20,6 +20,7 @@ setup(
     url='https://github.com/ascv/HyperLogLog',
     ext_modules=[module],
     zip_safe=False,
+    python_requires='>=3.6, <4',
     keywords=['algorithm', 'approximate counting', 'big data', 'big data', 'cardinality', 'cardinality estimate', 'counting', 'data analysis', 'data processing', 'data science', 'data sketching', 'efficient computation', 'estimating cardinality', 'fast', 'frequency estimation', 'hyper log log', 'hyper loglog', 'hyperloglog', 'large-scale data', 'log log', 'loglog', 'memory efficient', 'probability estimate', 'probability sketch', 'probablistic counting', 'probablistic data structures', 'real-time analytics', 'scalable', 'set cardinality', 'set operations', 'sketch', 'statistical analysis', 'streaming algorithms', 'streaming algorithms', 'unique count', 'unique element counting'],
     license='MIT',
     long_description=readme,
