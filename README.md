@@ -92,7 +92,7 @@ to `p=12` or `2^12` registers.
 >>> for data in ['one', 'two', 'three', 'four',]:
 ...     hll.add(data)
 >>> hll.cardinality()
-4L
+4
 ```
 
 HyperLogLogs use a Murmur64A hash. This function is fast and has a good
