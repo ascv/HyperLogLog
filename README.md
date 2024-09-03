@@ -11,9 +11,9 @@ Quick start
 ===========
 
 Install Python development libraries. This step will depend on your OS. On
-Ubuntu:
+Ubuntu 24.0.4 LTS:
 ```
-sudo apt install python-dev
+sudo apt install python-dev-is-python3
 ```
 
 Install HLL:
