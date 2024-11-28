@@ -1148,7 +1148,7 @@ static inline uint8_t clz(uint64_t x) {
         if (x >= (1UL << 48UL)) {
             shift = (x >= (1UL << 56UL)) ? 56 : 48;
         } else {
-            shift = (x >= (1UL << 38UL)) ? 40 : 32;
+            shift = (x >= (1UL << 40UL)) ? 40 : 32;
         }
     } else {
         if (x >= (1U << 16U)) {
