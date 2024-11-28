@@ -32,6 +32,12 @@ estimate = hll.cardinality()
 print(estimate)
 ```
 
+2.3 Changelog
+=============
+
+* Fix bug causing cardinalities on the order of $2^{45}$ to be
+  under-estimated.
+
 2.2 Changelog
 =============
 
@@ -80,7 +86,7 @@ be used to estimate the cardinality of very large datasets. The estimation
 accuracy is proportional to the number of registers. Using more registers
 increases the accuracy and using less registers decreases the accuracy. The
 number of registers is set in powers of 2 using the parameter `p` and defaults
-to `p=12` or `2^12` registers.
+to `p=12` or $2^{12}$ registers.
 ```
 >>> from hll import HyperLogLog
 >>> hll = HyperLogLog() # Default to 2^12 registers
