@@ -3,7 +3,7 @@ Overview
 
 The HyperLogLog algorithm [1] is a space efficient method to estimate the
 cardinality of extraordinarily large datasets. This module is written in C
-for Python >= 3.6 and Python 2.7.x. It implements a 64 bit version of
+for Python >= 3.6. It implements a 64 bit version of
 HyperLogLog [2] using a Murmur64A hash.
 
 
