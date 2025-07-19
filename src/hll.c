@@ -1105,10 +1105,10 @@ PyInit_HLL(void)
 /* Counts leading zeros (number of consecutive of zero bits from the left) in
  * an unsigned 64bit integer. */
 static inline uint8_t clz(uint64_t x) {
-
-    uint8_t shift;
-
-    static uint8_t const zeroes[] = {
+#if defined(__GNUC__) || defined(__clang__)
+    return x ? __builtin_clzll(x) : 64;
+#else
+    static const uint8_t zeroes[] = {
         64, 63, 62, 62, 61, 61, 61, 61,
         60, 60, 60, 60, 60, 60, 60, 60,
         59, 59, 59, 59, 59, 59, 59, 59,
@@ -1139,31 +1139,28 @@ static inline uint8_t clz(uint64_t x) {
         56, 56, 56, 56, 56, 56, 56, 56,
         56, 56, 56, 56, 56, 56, 56, 56,
         56, 56, 56, 56, 56, 56, 56, 56,
-        56, 56, 56, 56, 56, 56, 56, 56,
         56, 56, 56, 56, 56, 56, 56, 56
     };
 
-    /* Do a binary search to find which byte contains the first set bit. */
-    if (x >= (1UL << 32UL)) {
-        if (x >= (1UL << 48UL)) {
-            shift = (x >= (1UL << 56UL)) ? 56 : 48;
+    uint8_t shift;
+
+    if (x >= (1ULL << 32)) {
+        if (x >= (1ULL << 48)) {
+            shift = (x >= (1ULL << 56)) ? 56 : 48;
         } else {
-            shift = (x >= (1UL << 40UL)) ? 40 : 32;
+            shift = (x >= (1ULL << 40)) ? 40 : 32;
         }
     } else {
-        if (x >= (1U << 16U)) {
-            shift = (x >= (1U << 24U)) ? 24 : 16;
+        if (x >= (1U << 16)) {
+            shift = (x >= (1U << 24)) ? 24 : 16;
         } else {
-            shift = (x >= (1U << 8U)) ? 8 : 0;
+            shift = (x >= (1U << 8)) ? 8 : 0;
         }
     }
 
-    /* Get the byte containing the first set bit. */
     uint8_t fsbByte = (uint8_t)(x >> shift);
-
-    /* Look up the leading zero count for (x >> shift) using byte. Subtract
-     * the bit shift to get the leading zero count for x. */
     return zeroes[fsbByte] - shift;
+#endif
 }
 
 
