@@ -32,6 +32,11 @@ estimate = hll.cardinality()
 print(estimate)
 ```
 
+2.4 Changelog
+=============
+
+* Use compiler built-in leading zero counts for GCC and Clang.
+
 2.3 Changelog
 =============
 
