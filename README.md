@@ -35,7 +35,7 @@ print(estimate)
 2.4 Changelog
 =============
 
-* Use compiler built-in leading zero counts for GCC and Clang.
+* Use compiler built-ins for leading zero counts if using GCC or Clang.
 
 2.3 Changelog
 =============
