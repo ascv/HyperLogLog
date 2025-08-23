@@ -32,24 +32,27 @@ estimate = hll.cardinality()
 print(estimate)
 ```
 
-2.4 Changelog
-=============
+Changelog
+=========
+
+2.4
+---
 
 * Use compiler built-ins for leading zero counts if using GCC or Clang.
 
-2.3 Changelog
-=============
+2.3
+---
 
 * Fix bug causing cardinalities on the order of $2^{45}$ to be
   under-estimated.
 
-2.2 Changelog
-=============
+2.2
+---
 
 * Remove support for Python 2.7.
 
-2.1 Changelog
-=============
+2.1
+---
 
 **Deprecation notice**: this is the last supported version for Python 2.7.x.
 
@@ -57,8 +60,8 @@ print(estimate)
 * Fixed bug causing cardinality estimates to be off when repeatedly merging
   sparse HyperLogLogs loaded from a pickle dump.
 
-2.0 Changelog
-=============
+2.0
+---
 
 * Algorithm has been updated to a 64 bit version [2]. This fixes the
   spike in relative error when switching from linear counting in the
