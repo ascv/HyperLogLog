@@ -617,7 +617,7 @@ static PyObject* HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
         "is_cached", self->isCached,
         "is_sparse", self->isSparse,
         "max_list_size", self->maxListSize,
-        "max_buffer_size", self->maxListSize,
+        "max_buffer_size", self->maxBufferSize,
         "node_cache_index", cacheIndex,
         "node_cache_value", cacheValue,
         "py_version", version,

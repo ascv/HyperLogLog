@@ -153,6 +153,22 @@ class TestMerging(unittest.TestCase):
             self.assertEqual(max_fsb, hll_c.get_register(i))
 
 
+class TestGetMeta(unittest.TestCase):
+
+    def test_max_buffer_size_reports_correctly(self):
+        hll = HyperLogLog(8, max_sparse_list_size=1000, max_sparse_buffer_size=500)
+        meta = hll._get_meta()
+        self.assertEqual(meta['max_list_size'], 1000)
+        self.assertEqual(meta['max_buffer_size'], 500)
+
+    def test_max_buffer_size_default(self):
+        hll = HyperLogLog(8, max_sparse_list_size=100)
+        meta = hll._get_meta()
+        self.assertEqual(meta['max_list_size'], 100)
+        # Default buffer size is max_list_size / 2
+        self.assertEqual(meta['max_buffer_size'], 50)
+
+
 class TestPickling(unittest.TestCase):
 
     def setUp(self):
