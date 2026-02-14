@@ -565,6 +565,41 @@ static PyObject* HyperLogLog_get_register(HyperLogLog* self, PyObject* args)
 }
 
 
+/* Returns all register values as a bytes object of length 2^p.
+ * Each byte is one register value (0-63). */
+static PyObject* HyperLogLog_registers(HyperLogLog* self)
+{
+    uint64_t size = self->size;
+    PyObject* result = PyBytes_FromStringAndSize(NULL, (Py_ssize_t)size);
+    if (result == NULL) return NULL;
+
+    uint8_t* buf = (uint8_t*)PyBytes_AS_STRING(result);
+
+    if (self->isSparse) {
+        if (self->bufferSize > 0) {
+            flushRegisterBuffer(self);
+        }
+
+        /* Initialize all registers to zero */
+        memset(buf, 0, size);
+
+        /* Walk the sorted linked list and fill in non-zero registers */
+        struct Node* current = self->sparseRegisterList;
+        while (current != NULL) {
+            buf[current->index] = current->fsb;
+            current = current->next;
+        }
+    } else {
+        /* Unpack 6-bit dense registers */
+        for (uint64_t i = 0; i < size; i++) {
+            buf[i] = (uint8_t)getDenseRegister(i, self->registers);
+        }
+    }
+
+    return result;
+}
+
+
 /* Gets a dictionary of internal attributes and their values */
 static PyObject* HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
 {
@@ -647,6 +682,28 @@ static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
         Py_RETURN_FALSE;
     }
 };
+
+
+/* Add a range of sequential 8-byte little-endian integers [start, start+count).
+ * This avoids Python-to-C overhead for bulk insertions. */
+static PyObject* HyperLogLog_add_range(HyperLogLog* self, PyObject* args)
+{
+    uint64_t start, count;
+
+    if (!PyArg_ParseTuple(args, "KK", &start, &count)) return NULL;
+
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t val = start + i;
+        uint64_t hash = MurmurHash64A((void*)&val, 8, self->seed);
+        uint64_t index = (hash >> (64 - self->p));
+        uint64_t newFsb = hash << self->p;
+        newFsb = clz(newFsb) + 1;
+        self->added++;
+        setRegister(self, index, (uint8_t)newFsb);
+    }
+
+    Py_RETURN_NONE;
+}
 
 
 /* Get a cardinality estimate */
@@ -1001,6 +1058,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     {"add", (PyCFunction)HyperLogLog_add, METH_VARARGS,
      "Add an element."
     },
+    {"add_range", (PyCFunction)HyperLogLog_add_range, METH_VARARGS,
+     "Add a range of sequential integers [start, start+count) as 8-byte LE."
+    },
     {"cardinality", (PyCFunction)HyperLogLog_cardinality, METH_NOARGS,
      "Get the cardinality."
     },
@@ -1018,6 +1078,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"get_register", (PyCFunction)HyperLogLog_get_register, METH_VARARGS,
      "Get the value of a register."
+    },
+    {"registers", (PyCFunction)HyperLogLog_registers, METH_NOARGS,
+     "Get all register values as a bytes object."
     },
     {"_histogram", (PyCFunction)HyperLogLog__histogram, METH_NOARGS,
      "Get a histogram of the register values."
