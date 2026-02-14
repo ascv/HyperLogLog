@@ -837,6 +837,11 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 
     if (!PyArg_ParseTuple(args, "O", &otherHLL)) return NULL;
 
+    if (!PyObject_TypeCheck((PyObject*)otherHLL, Py_TYPE(self))) {
+        PyErr_SetString(PyExc_TypeError, "Argument must be a HyperLogLog instance");
+        return NULL;
+    }
+
     otherSize = otherHLL->size;
 
     if (otherSize != self->size) {
