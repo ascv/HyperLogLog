@@ -305,5 +305,143 @@ class TestPickling(unittest.TestCase):
             hll2 = pickle.loads(pickle.dumps(hll))
             self.assertEqual(hll.size(), hll2.size())
 
+class TestIntersectionCardinality(unittest.TestCase):
+
+    def test_wrong_type_raises_type_error(self):
+        hll = HyperLogLog(8)
+        with self.assertRaises(TypeError):
+            hll.intersection_cardinality("hello")
+        with self.assertRaises(TypeError):
+            hll.intersection_cardinality(123)
+        with self.assertRaises(TypeError):
+            hll.intersection_cardinality(None)
+
+    def test_mismatched_p_raises_value_error(self):
+        a = HyperLogLog(8)
+        b = HyperLogLog(10)
+        with self.assertRaises(ValueError):
+            a.intersection_cardinality(b)
+
+    def test_empty_hlls(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        self.assertEqual(a.intersection_cardinality(b), 0)
+
+    def test_one_empty(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        for i in range(1000):
+            a.add(str(i))
+        self.assertEqual(a.intersection_cardinality(b), 0)
+
+    def test_disjoint_sets(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        for i in range(10000):
+            a.add(str(i))
+        for i in range(10000, 20000):
+            b.add(str(i))
+        result = a.intersection_cardinality(b)
+        # Disjoint: expect near zero (may not be exactly zero due to estimation)
+        self.assertLess(result, 2000)
+
+    def test_identical_sets(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        for i in range(50000):
+            a.add(str(i))
+            b.add(str(i))
+        card = a.cardinality()
+        result = a.intersection_cardinality(b)
+        # Should be close to the cardinality of the set
+        self.assertAlmostEqual(result, card, delta=card * 0.15)
+
+    def test_subset(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        # A is a subset of B
+        for i in range(10000):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(10000, 50000):
+            b.add(str(i))
+        result = a.intersection_cardinality(b)
+        expected = a.cardinality()
+        self.assertAlmostEqual(result, expected, delta=expected * 0.20)
+
+    def test_partial_overlap(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        n_shared = 50000
+        n_unique = 50000
+
+        for i in range(n_shared):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(n_shared, n_shared + n_unique):
+            a.add(str(i))
+        for i in range(n_shared + n_unique, n_shared + 2 * n_unique):
+            b.add(str(i))
+
+        result = a.intersection_cardinality(b)
+        self.assertAlmostEqual(result, n_shared, delta=n_shared * 0.15)
+
+    def test_symmetry(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        for i in range(30000):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(30000, 60000):
+            a.add(str(i))
+        for i in range(60000, 90000):
+            b.add(str(i))
+        self.assertEqual(a.intersection_cardinality(b),
+                         b.intersection_cardinality(a))
+
+    def test_sparse_x_sparse(self):
+        a = HyperLogLog(12, sparse=True)
+        b = HyperLogLog(12, sparse=True)
+        for i in range(200):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(200, 400):
+            a.add(str(i))
+        result = a.intersection_cardinality(b)
+        self.assertAlmostEqual(result, 200, delta=100)
+
+    def test_dense_x_dense(self):
+        a = HyperLogLog(12, sparse=False)
+        b = HyperLogLog(12, sparse=False)
+        for i in range(20000):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(20000, 40000):
+            a.add(str(i))
+        result = a.intersection_cardinality(b)
+        self.assertAlmostEqual(result, 20000, delta=20000 * 0.15)
+
+    def test_sparse_x_dense(self):
+        a = HyperLogLog(12, sparse=True)
+        b = HyperLogLog(12, sparse=False)
+        for i in range(200):
+            a.add(str(i))
+            b.add(str(i))
+        for i in range(200, 400):
+            b.add(str(i))
+        result = a.intersection_cardinality(b)
+        self.assertAlmostEqual(result, 200, delta=100)
+
+    def test_single_element(self):
+        a = HyperLogLog(12)
+        b = HyperLogLog(12)
+        a.add('x')
+        b.add('x')
+        result = a.intersection_cardinality(b)
+        # Should be 1 or close to it
+        self.assertLessEqual(result, 5)
+        self.assertGreaterEqual(result, 0)
+
+
 if __name__ == '__main__':
     unittest.main()
