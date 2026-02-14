@@ -1,6 +1,5 @@
 import pickle
 import random
-import sys
 import unittest
 
 from HLL import HyperLogLog
@@ -81,6 +80,18 @@ class TestMerging(unittest.TestCase):
         with self.assertRaises(Exception):
             hll = HyperLogLog(4)
             hll.merge(HyperLogLog(5))
+
+    def test_merge_type_check(self):
+        hll = HyperLogLog(4)
+
+        with self.assertRaises(TypeError):
+            hll.merge("hello")
+
+        with self.assertRaises(TypeError):
+            hll.merge(123)
+
+        with self.assertRaises(TypeError):
+            hll.merge(None)
 
     def test_sparse_x_dense_merge(self):
         k = 8
