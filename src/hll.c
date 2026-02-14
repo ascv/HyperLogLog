@@ -1272,6 +1272,113 @@ static inline double tau(double x) {
 }
 
 
+/* =================== Intersection cardinality (JMLE) ===================== */
+
+/*
+ * Maximum likelihood cardinality estimator for a single HyperLogLog sketch.
+ * Uses the iterative Newton/secant method from Ertl (2017).
+ *
+ * c:      register histogram c[0..q+1]
+ * p:      precision parameter
+ * q:      64 - p
+ * relerr: relative error tolerance for convergence
+ *
+ * Returns the MLE cardinality estimate.
+ */
+static double mlEstimate(const uint64_t* c, unsigned p, unsigned q, double relerr)
+{
+    uint64_t m = 1ULL << p;
+    int kMin, kMax;
+    int kMinPrime, kMaxPrime;
+    double x, xPrime, deltaX, gPrev, h, g;
+    int a;
+
+    /* Find range of non-zero histogram bins */
+    for (kMin = 0; kMin <= (int)q + 1; kMin++) {
+        if (c[kMin] > 0) break;
+    }
+    for (kMax = (int)q + 1; kMax >= 0; kMax--) {
+        if (c[kMax] > 0) break;
+    }
+
+    /* Initial estimate from raw harmonic sum */
+    x = 0.0;
+    for (int k = kMax; k >= 1; k--) {
+        x = 0.5 * x + (double)c[k];
+    }
+    x = ldexp(x, -kMin);  /* x *= 2^(-kMin) */
+    if (x == 0.0) return 0.0;
+
+    /* Normalize: initial cardinality guess */
+    x = (double)m / x;
+
+    gPrev = 0.0;
+    deltaX = x;
+
+    /* Iterative secant/Newton refinement */
+    while (1) {
+        int exponent;
+        xPrime = frexp(x, &exponent);  /* x = xPrime * 2^exponent */
+        kMinPrime = (int)((double)kMin + exponent <= 0 ? 0 : kMin + exponent);
+        kMaxPrime = (int)((double)kMax + exponent >= (int)q + 2 ? (int)q + 2 : kMax + exponent);
+
+        /* Taylor polynomial approximation: h(x) ≈ x - x²/3 + x⁴(1/45 - x²/472.5) */
+        h = xPrime;
+        h -= xPrime * xPrime / 3.0;
+        {
+            double x2 = xPrime * xPrime;
+            double x4 = x2 * x2;
+            h += x4 * (1.0/45.0 - x2 / 472.5);
+        }
+
+        /* Scale h from high exponent down to kMaxPrime */
+        for (a = (int)q + 2 - 1; a >= kMaxPrime; a--) {
+            h = 0.5 * h + xPrime;
+            h *= 0.5;
+        }
+
+        /* Accumulate g from histogram contributions */
+        g = (double)c[(int)q + 1] * h;
+        for (a = kMaxPrime - 1; a >= kMinPrime; a--) {
+            h = 0.5 * h + xPrime;
+            h *= 0.5;
+            if (a >= kMin && a <= kMax) {
+                g += (double)c[a] * h;
+            }
+        }
+
+        /* Scale remaining */
+        for (; a >= kMin; a--) {
+            h = 0.5 * h + xPrime;
+            h *= 0.5;
+            g += (double)c[a] * h;
+        }
+
+        g += x * (double)c[0];
+
+        /* Secant step */
+        if (gPrev != 0.0 && g != gPrev) {
+            deltaX *= (g - (double)m) / (gPrev - g);
+        }
+
+        /* Convergence check */
+        if (fabs(deltaX) <= x * relerr / sqrt((double)m)) {
+            break;
+        }
+
+        x += deltaX;
+        gPrev = g;
+
+        /* Safety: if x goes non-positive, reset */
+        if (x <= 0.0) {
+            x = 1e-10;
+        }
+    }
+
+    return x * (double)m;
+}
+
+
 /* Print the bits in a byte. */
 void printByte(uint8_t b)
 {
