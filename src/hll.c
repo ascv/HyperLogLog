@@ -406,16 +406,17 @@ void flushRegisterBuffer(HyperLogLog* self)
 }
 
 
-/* Transforms a HyperLogLog from sparse to dense representation. */
-void transformToDense(HyperLogLog* self) {
+/* Transforms a HyperLogLog from sparse to dense representation.
+ * Returns 0 on success, -1 on allocation failure (sets MemoryError). */
+int transformToDense(HyperLogLog* self) {
     uint64_t bytes = (self->size*6)/8 + 1;
     self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
 
     if (self->registers == NULL) {
-        char* msg = (char*)malloc(128 * sizeof(char));
-        sprintf(msg, "Failed to allocate %lu bytes.", bytes);
+        char msg[128];
+        snprintf(msg, sizeof(msg), "Failed to allocate %lu bytes.", bytes);
         PyErr_SetString(PyExc_MemoryError, msg);
-        return;
+        return -1;
     }
 
     flushRegisterBuffer(self);
@@ -449,6 +450,8 @@ void transformToDense(HyperLogLog* self) {
     self->sparseRegisterList = NULL;
     self->nodeCache = NULL;
     self->isSparse = 0;
+
+    return 0;
 }
 
 
@@ -512,7 +515,7 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
 
 /* Set a HyperLogLog register. This is a convenience function intended to make
  * register updates representation agnostic. */
-static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
+static inline int setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb) {
     self->added++; /* Increment method call counter */
 
     if (self->isSparse) {
@@ -520,7 +523,9 @@ static inline bool setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb
 
         /* Switch to dense representation? */
         if (self->listSize >= self->maxListSize) {
-            transformToDense(self);
+            if (transformToDense(self) < 0) {
+                return -1;
+            }
         }
 
         self->isCached = 0;
@@ -674,7 +679,9 @@ static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
     index = (hash >> (64 - self->p)); /* Use the first p bits as an index */
     newFsb = hash << self->p; /* Remove the first p bits */
     newFsb = clz(newFsb) + 1; /* Find the first set bit in the remaining bits */
-    bool updated = setRegister(self, index, (uint8_t)newFsb);
+    int updated = setRegister(self, index, (uint8_t)newFsb);
+
+    if (updated < 0) return NULL;
 
     if (updated) {
         Py_RETURN_TRUE;
@@ -699,7 +706,7 @@ static PyObject* HyperLogLog_add_range(HyperLogLog* self, PyObject* args)
         uint64_t newFsb = hash << self->p;
         newFsb = clz(newFsb) + 1;
         self->added++;
-        setRegister(self, index, (uint8_t)newFsb);
+        if (setRegister(self, index, (uint8_t)newFsb) < 0) return NULL;
     }
 
     Py_RETURN_NONE;
@@ -817,8 +824,8 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
         self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
 
         if (self->registers == NULL) {
-            char* msg = (char*)malloc(128 * sizeof(char));
-            sprintf(msg, "Failed to allocate %lu bytes. Use a smaller p.", bytes);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Failed to allocate %lu bytes. Use a smaller p.", bytes);
             PyErr_SetString(PyExc_MemoryError, msg);
             return -1;
         }
@@ -868,7 +875,7 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
         }
 
         if (oldVal < newVal) {
-            setRegister(self, i, (uint8_t)newVal);
+            if (setRegister(self, i, (uint8_t)newVal) < 0) return NULL;
         }
     }
 
