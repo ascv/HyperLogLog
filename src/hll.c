@@ -664,8 +664,8 @@ static void HyperLogLog_dealloc(HyperLogLog* self)
 /* Add an element. */
 static PyObject* HyperLogLog_add(HyperLogLog* self, PyObject* args)
 {
-    const uint8_t* data;
-    const uint64_t dataLen;
+    const char* data;
+    Py_ssize_t dataLen;
     uint64_t hash, index, newFsb;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
@@ -738,8 +738,8 @@ static PyObject* HyperLogLog_cardinality(HyperLogLog* self)
 /* Get a Murmur64A hash of a string, buffer or bytes object. */
 static PyObject* HyperLogLog_hash(HyperLogLog* self, PyObject* args)
 {
-    const uint8_t* data;
-    const uint64_t dataLen;
+    const char* data;
+    Py_ssize_t dataLen;
 
     if (!PyArg_ParseTuple(args, "s#", &data, &dataLen)) return NULL;
 
