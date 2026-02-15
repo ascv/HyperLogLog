@@ -877,6 +877,90 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 }
 
 
+/* Forward declarations for JMLE helper functions (defined below in helper section) */
+static double mlEstimate(const uint64_t* c, unsigned p, unsigned q, double relerr);
+static void buildJointHistogram(HyperLogLog* a, HyperLogLog* b,
+    uint64_t* c1, uint64_t* c2, uint64_t* cu,
+    uint64_t* ceq, uint64_t* cg1, uint64_t* cg2);
+
+/* Estimate the intersection cardinality with another HyperLogLog using
+ * Ertl's Joint Maximum Likelihood Estimation (JMLE) method. */
+static PyObject* HyperLogLog_intersection_cardinality(HyperLogLog* self, PyObject* args)
+{
+    HyperLogLog* other;
+    unsigned p, q;
+    uint64_t m;
+    double cAX, cBX, cABX, cAXBhalf, cBXAhalf;
+    double cX1, cX2, cardX;
+    uint64_t result;
+
+    if (!PyArg_ParseTuple(args, "O", &other)) return NULL;
+
+    if (!PyObject_TypeCheck((PyObject*)other, Py_TYPE(self))) {
+        PyErr_SetString(PyExc_TypeError, "Argument must be a HyperLogLog instance");
+        return NULL;
+    }
+
+    if (other->size != self->size) {
+        PyErr_SetString(PyExc_ValueError, "Unequal sizes");
+        return NULL;
+    }
+
+    p = self->p;
+    q = 64 - p;
+    m = self->size;
+
+    /* Flush sparse buffers before reading registers */
+    if (self->isSparse && self->bufferSize > 0) {
+        flushRegisterBuffer(self);
+    }
+    if (other->isSparse && other->bufferSize > 0) {
+        flushRegisterBuffer(other);
+    }
+
+    /* Stack-allocate joint histogram arrays */
+    uint64_t c1[66] = {0};  /* Sketch A histogram */
+    uint64_t c2[66] = {0};  /* Sketch B histogram */
+    uint64_t cu[66] = {0};  /* Union (max) histogram */
+    uint64_t ceq[66] = {0}; /* Equal counts by value */
+    uint64_t cg1[66] = {0}; /* Counts where A > B by A's value */
+    uint64_t cg2[66] = {0}; /* Counts where B > A by B's value */
+
+    buildJointHistogram(self, other, c1, c2, cu, ceq, cg1, cg2);
+
+    /* Individual and union MLE estimates */
+    cAX  = mlEstimate(c1, p, q, 1e-2);
+    cBX  = mlEstimate(c2, p, q, 1e-2);
+    cABX = mlEstimate(cu, p, q, 1e-2);
+
+    /* Build half-range histograms for the JMLE refinement.
+     * These combine joint histogram bins at shifted precision (q-1). */
+    uint64_t countsAXBhalf[66] = {0};
+    uint64_t countsBXAhalf[66] = {0};
+    countsAXBhalf[q] = m;
+    countsBXAhalf[q] = m;
+
+    for (unsigned k = 0; k < q; k++) {
+        countsAXBhalf[k] = cg1[k] + ceq[k] + cg2[k + 1];
+        countsAXBhalf[q] -= countsAXBhalf[k];
+
+        countsBXAhalf[k] = cg2[k] + ceq[k] + cg1[k + 1];
+        countsBXAhalf[q] -= countsBXAhalf[k];
+    }
+
+    cAXBhalf = mlEstimate(countsAXBhalf, p, q - 1, 1e-2);
+    cBXAhalf = mlEstimate(countsBXAhalf, p, q - 1, 1e-2);
+
+    /* Combine two independent intersection estimators (Ertl JMLE formula) */
+    cX1 = 1.5 * cBX + 1.5 * cAX - cBXAhalf - cAXBhalf;
+    cX2 = 2.0 * (cBXAhalf + cAXBhalf) - 3.0 * cABX;
+    cardX = 0.5 * (cX1 + cX2);
+
+    result = (cardX > 0.5) ? (uint64_t)round(cardX) : 0;
+    return Py_BuildValue("K", result);
+}
+
+
 static PyObject* HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kwds)
 {
     HyperLogLog* self;
@@ -1071,6 +1155,9 @@ static PyMethodDef HyperLogLog_methods[] = {
     },
     {"merge", (PyCFunction)HyperLogLog_merge, METH_VARARGS,
      "Merge another HyperLogLog."
+    },
+    {"intersection_cardinality", (PyCFunction)HyperLogLog_intersection_cardinality, METH_VARARGS,
+     "Estimate the intersection cardinality with another HyperLogLog using Ertl's JMLE method."
     },
     {"hash", (PyCFunction)HyperLogLog_hash, METH_VARARGS,
      "Get a MurmurHash64A hash."
@@ -1276,12 +1363,14 @@ static inline double tau(double x) {
 
 /*
  * Maximum likelihood cardinality estimator for a single HyperLogLog sketch.
- * Uses the iterative Newton/secant method from Ertl (2017).
+ * Uses the iterative secant method from Ertl (2017), Algorithm 5.
+ *
+ * Based on the reference implementation in dnbaker/sketch.
  *
  * c:      register histogram c[0..q+1]
  * p:      precision parameter
- * q:      64 - p
- * relerr: relative error tolerance for convergence
+ * q:      64 - p (number of non-index bits)
+ * relerr: relative error tolerance for convergence (default 1e-2)
  *
  * Returns the MLE cardinality estimate.
  */
@@ -1290,89 +1379,76 @@ static double mlEstimate(const uint64_t* c, unsigned p, unsigned q, double reler
     uint64_t m = 1ULL << p;
     int kMin, kMax;
     int kMinPrime, kMaxPrime;
-    double x, xPrime, deltaX, gPrev, h, g;
-    int a;
+    double z, gprev, x, a, deltaX;
+    unsigned cPrime;
+    int mPrime;
+
+    if (c[q + 1] == m) return INFINITY;
 
     /* Find range of non-zero histogram bins */
-    for (kMin = 0; kMin <= (int)q + 1; kMin++) {
-        if (c[kMin] > 0) break;
+    for (kMin = 0; c[kMin] == 0; kMin++) {}
+    kMinPrime = kMin > 1 ? kMin : 1;
+    for (kMax = (int)q + 1; kMax > 0 && c[kMax] == 0; kMax--) {}
+    kMaxPrime = kMax < (int)q ? kMax : (int)q;
+
+    /* Initial estimate z from normalized harmonic sum */
+    z = 0.0;
+    for (int k = kMaxPrime; k >= kMinPrime; k--) {
+        z = 0.5 * z + (double)c[k];
     }
-    for (kMax = (int)q + 1; kMax >= 0; kMax--) {
-        if (c[kMax] > 0) break;
+    z = ldexp(z, -kMinPrime);
+
+    cPrime = (unsigned)c[q + 1];
+    if (q > 0) cPrime += (unsigned)c[kMaxPrime];
+
+    a = z + (double)c[0];
+    mPrime = (int)m - (int)c[0];
+    gprev = z + ldexp((double)c[q + 1], -(int)q);
+
+    if (gprev <= 1.5 * a) {
+        x = (double)mPrime / (0.5 * gprev + a);
+    } else {
+        x = ((double)mPrime / gprev) * log1p(gprev / a);
     }
 
-    /* Initial estimate from raw harmonic sum */
-    x = 0.0;
-    for (int k = kMax; k >= 1; k--) {
-        x = 0.5 * x + (double)c[k];
-    }
-    x = ldexp(x, -kMin);  /* x *= 2^(-kMin) */
-    if (x == 0.0) return 0.0;
-
-    /* Normalize: initial cardinality guess */
-    x = (double)m / x;
-
-    gPrev = 0.0;
+    gprev = 0.0;
     deltaX = x;
+    relerr /= sqrt((double)m);
 
-    /* Iterative secant/Newton refinement */
-    while (1) {
-        int exponent;
-        xPrime = frexp(x, &exponent);  /* x = xPrime * 2^exponent */
-        kMinPrime = (int)((double)kMin + exponent <= 0 ? 0 : kMin + exponent);
-        kMaxPrime = (int)((double)kMax + exponent >= (int)q + 2 ? (int)q + 2 : kMax + exponent);
+    while (deltaX > x * relerr) {
+        int kappaMinus1;
+        frexp(x, &kappaMinus1);
 
-        /* Taylor polynomial approximation: h(x) ≈ x - x²/3 + x⁴(1/45 - x²/472.5) */
-        h = xPrime;
-        h -= xPrime * xPrime / 3.0;
-        {
-            double x2 = xPrime * xPrime;
-            double x4 = x2 * x2;
-            h += x4 * (1.0/45.0 - x2 / 472.5);
+        int shift = kMaxPrime + 1;
+        if (kappaMinus1 + 2 > shift) shift = kappaMinus1 + 2;
+        double xPrime = ldexp(x, -shift);
+        double xPrime2 = xPrime * xPrime;
+        double h = xPrime - xPrime2 / 3.0
+                   + (xPrime2 * xPrime2) * (1.0/45.0 - xPrime2 / 472.5);
+
+        for (int k = kappaMinus1; k >= kMaxPrime; k--) {
+            double hPrime = 1.0 - h;
+            h = (xPrime + h * hPrime) / (xPrime + hPrime);
+            xPrime += xPrime;
         }
 
-        /* Scale h from high exponent down to kMaxPrime */
-        for (a = (int)q + 2 - 1; a >= kMaxPrime; a--) {
-            h = 0.5 * h + xPrime;
-            h *= 0.5;
+        double g = (double)cPrime * h;
+        for (int k = kMaxPrime - 1; k >= kMinPrime; k--) {
+            double hPrime = 1.0 - h;
+            h = (xPrime + h * hPrime) / (xPrime + hPrime);
+            xPrime += xPrime;
+            g += (double)c[k] * h;
         }
+        g += x * a;
 
-        /* Accumulate g from histogram contributions */
-        g = (double)c[(int)q + 1] * h;
-        for (a = kMaxPrime - 1; a >= kMinPrime; a--) {
-            h = 0.5 * h + xPrime;
-            h *= 0.5;
-            if (a >= kMin && a <= kMax) {
-                g += (double)c[a] * h;
-            }
-        }
-
-        /* Scale remaining */
-        for (; a >= kMin; a--) {
-            h = 0.5 * h + xPrime;
-            h *= 0.5;
-            g += (double)c[a] * h;
-        }
-
-        g += x * (double)c[0];
-
-        /* Secant step */
-        if (gPrev != 0.0 && g != gPrev) {
-            deltaX *= (g - (double)m) / (gPrev - g);
-        }
-
-        /* Convergence check */
-        if (fabs(deltaX) <= x * relerr / sqrt((double)m)) {
-            break;
+        if (gprev < g && g <= (double)mPrime) {
+            deltaX *= (g - (double)mPrime) / (gprev - g);
+        } else {
+            deltaX = 0;
         }
 
         x += deltaX;
-        gPrev = g;
-
-        /* Safety: if x goes non-positive, reset */
-        if (x <= 0.0) {
-            x = 1e-10;
-        }
+        gprev = g;
     }
 
     return x * (double)m;
@@ -1385,17 +1461,17 @@ static double mlEstimate(const uint64_t* c, unsigned p, unsigned q, double reler
  *
  * Both HLLs must have buffers flushed before calling.
  *
- * equal[k]:    count of positions where register_a[i] == register_b[i] == k
- * larger1[k]:  count of positions where register_a[i] == k > register_b[i]
- * larger2[k]:  count of positions where register_b[i] == k > register_a[i]
- * smaller1[k]: count of positions where register_a[i] == k < register_b[i]
- * smaller2[k]: count of positions where register_b[i] == k < register_a[i]
+ * c1[k]:  count of positions where register_a[i] == k (sketch A histogram)
+ * c2[k]:  count of positions where register_b[i] == k (sketch B histogram)
+ * cu[k]:  count of positions where max(register_a[i], register_b[i]) == k (union)
+ * ceq[k]: count of positions where register_a[i] == register_b[i] == k
+ * cg1[k]: count of positions where register_a[i] == k > register_b[i]
+ * cg2[k]: count of positions where register_b[i] == k > register_a[i]
  */
 static void buildJointHistogram(
     HyperLogLog* a, HyperLogLog* b,
-    uint64_t* equal, uint64_t* larger1, uint64_t* larger2,
-    uint64_t* smaller1, uint64_t* smaller2,
-    unsigned q)
+    uint64_t* c1, uint64_t* c2, uint64_t* cu,
+    uint64_t* ceq, uint64_t* cg1, uint64_t* cg2)
 {
     uint64_t m = a->size;
 
@@ -1414,14 +1490,18 @@ static void buildJointHistogram(
             vb = getDenseRegister(i, b->registers);
         }
 
+        c1[va]++;
+        c2[vb]++;
+
         if (va == vb) {
-            equal[va]++;
+            cu[va]++;
+            ceq[va]++;
         } else if (va > vb) {
-            larger1[va]++;
-            smaller2[vb]++;
+            cu[va]++;
+            cg1[va]++;
         } else {
-            larger2[vb]++;
-            smaller1[va]++;
+            cu[vb]++;
+            cg2[vb]++;
         }
     }
 }
