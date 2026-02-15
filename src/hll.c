@@ -1379,6 +1379,54 @@ static double mlEstimate(const uint64_t* c, unsigned p, unsigned q, double reler
 }
 
 
+/*
+ * Build joint register histograms for two HyperLogLog sketches.
+ * Classifies each register position by comparing values from both sketches.
+ *
+ * Both HLLs must have buffers flushed before calling.
+ *
+ * equal[k]:    count of positions where register_a[i] == register_b[i] == k
+ * larger1[k]:  count of positions where register_a[i] == k > register_b[i]
+ * larger2[k]:  count of positions where register_b[i] == k > register_a[i]
+ * smaller1[k]: count of positions where register_a[i] == k < register_b[i]
+ * smaller2[k]: count of positions where register_b[i] == k < register_a[i]
+ */
+static void buildJointHistogram(
+    HyperLogLog* a, HyperLogLog* b,
+    uint64_t* equal, uint64_t* larger1, uint64_t* larger2,
+    uint64_t* smaller1, uint64_t* smaller2,
+    unsigned q)
+{
+    uint64_t m = a->size;
+
+    for (uint64_t i = 0; i < m; i++) {
+        uint64_t va, vb;
+
+        if (a->isSparse) {
+            va = getSparseRegister(a, i);
+        } else {
+            va = getDenseRegister(i, a->registers);
+        }
+
+        if (b->isSparse) {
+            vb = getSparseRegister(b, i);
+        } else {
+            vb = getDenseRegister(i, b->registers);
+        }
+
+        if (va == vb) {
+            equal[va]++;
+        } else if (va > vb) {
+            larger1[va]++;
+            smaller2[vb]++;
+        } else {
+            larger2[vb]++;
+            smaller1[va]++;
+        }
+    }
+}
+
+
 /* Print the bits in a byte. */
 void printByte(uint8_t b)
 {
