@@ -705,7 +705,6 @@ static PyObject* HyperLogLog_add_range(HyperLogLog* self, PyObject* args)
         uint64_t index = (hash >> (64 - self->p));
         uint64_t newFsb = hash << self->p;
         newFsb = clz(newFsb) + 1;
-        self->added++;
         if (setRegister(self, index, (uint8_t)newFsb) < 0) return NULL;
     }
 
