@@ -24,20 +24,19 @@ typedef struct {
     bool isSparse; /* If sparse encoding is currently in use */
 
     /* Fields used for sparse representation */
-    struct Node* sparseRegisterList; /* Linked list of registers */
-    struct Node* sparseRegisterBuffer; /* Temporary buffer of nodes to be added */
-    struct Node* nodeCache; /* The last sparse register accessed using _get() */
+    struct SparseEntry* sparseRegisters; /* Sorted array of non-zero registers */
+    struct SparseEntry* sparseBuffer; /* Temporary buffer of entries to be merged */
+    uint64_t sparseCount; /* Number of entries in the sorted array */
+    uint64_t sparseCapacity; /* Allocated capacity of the sorted array */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
-    uint64_t listSize; /* Number of elements in the linked list */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
-    uint64_t maxListSize; /* Max number of nodes in the sparse list */
+    uint64_t maxListSize; /* Max number of entries before switching to dense */
 } HyperLogLog;
 
-typedef struct Node {
-    struct Node* next;
+typedef struct SparseEntry {
     uint64_t index;
     uint8_t fsb;
-} Node;
+} SparseEntry;
 
 
 /* ========================== Dense representation ========================= */
@@ -289,18 +288,19 @@ static inline void setDenseRegister(uint64_t m, uint8_t n, uint8_t* regs)
  */
 
 
-/* Compares two sparse register nodes. */
-int compareNodes(const void* a, const void* b) {
+/* Compares two sparse register entries. Sorts ascending by index, then
+ * descending by fsb so that the highest value comes first for duplicates. */
+int compareEntries(const void* a, const void* b) {
 
     int result = -1;
-    struct Node* A = (struct Node*) a;
-    struct Node* B = (struct Node*) b;
+    SparseEntry* A = (SparseEntry*) a;
+    SparseEntry* B = (SparseEntry*) b;
 
     if (A->index == B->index) {
         if (A->fsb > B->fsb) {
-            result = 1;
-        } else if (A->fsb < B->fsb) {
             result = -1;
+        } else if (A->fsb < B->fsb) {
+            result = 1;
         } else {
             result = 0;
         }
@@ -312,96 +312,81 @@ int compareNodes(const void* a, const void* b) {
 }
 
 
-/* Updates the register list using the items in the buffer. */
+/* Updates the sorted register array using the items in the buffer. */
 void flushRegisterBuffer(HyperLogLog* self)
 {
-    uint64_t i;
-    struct Node* node;
-    struct Node *current = self->sparseRegisterList;
-    struct Node *next = NULL;
-    struct Node *prev = NULL;
+    uint64_t i, j, w, bufCount, needed, newCap, dupes;
 
-    qsort(self->sparseRegisterBuffer, self->bufferSize, sizeof(struct Node), compareNodes);
+    if (self->bufferSize == 0) return;
 
-    for (i = 0; i < self->bufferSize; i++) {
+    /* Sort buffer by index ascending, fsb descending for same index */
+    qsort(self->sparseBuffer, self->bufferSize, sizeof(SparseEntry), compareEntries);
 
-        /* Create the new node from the current item in the buffer */
-        node = (struct Node*)malloc(sizeof(struct Node));
-        node->fsb = self->sparseRegisterBuffer[i].fsb;
-        node->index = self->sparseRegisterBuffer[i].index;
-        node->next = NULL;
-
-        /* If head doesn't exist then set it */
-        if (self->sparseRegisterList == NULL) {
-            self->sparseRegisterList = node;
-            self->histogram[0]--;
-            self->histogram[(uint8_t)node->fsb]++;
-            self->listSize += 1;
-            prev = node;
-            continue;
-        }
-
-        /* Since both lists are sorted try to use the last node */
-        if (prev != NULL) {
-            current = prev;
-        } else {
-            current = self->sparseRegisterList;
-        }
-
-        while (current != NULL) {
-
-            // Are we updating an existing node?
-            if (current->index == node->index) {
-                if (current->fsb < node->fsb) {
-                    self->histogram[current->fsb]--;
-                    self->histogram[node->fsb]++;
-                    current->fsb = node->fsb;
-                }
-
-                prev = current;
-
-                /* We don't need the new node */
-                free(node);
-                break;
-            }
-
-            // Are we creating a new head?
-            if (current->index > node->index) {
-                node->next = current;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->sparseRegisterList = node;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            // Are we creating a new tail?
-            if (current->next == NULL) {
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            // Are inserting between nodes?
-            if (current->next->index > node->index) {
-                node->next = current->next;
-                current->next = node;
-                self->histogram[0]--;
-                self->histogram[(uint8_t)node->fsb]++;
-                self->listSize += 1;
-                prev = node;
-                break;
-            }
-
-            next = current->next;
-            current = next;
+    /* Deduplicate buffer: keep only the first entry per index (highest fsb) */
+    bufCount = 1;
+    for (i = 1; i < self->bufferSize; i++) {
+        if (self->sparseBuffer[i].index != self->sparseBuffer[bufCount - 1].index) {
+            self->sparseBuffer[bufCount] = self->sparseBuffer[i];
+            bufCount++;
         }
     }
 
+    /* Ensure capacity for the merge */
+    needed = self->sparseCount + bufCount;
+    if (needed > self->sparseCapacity) {
+        newCap = self->sparseCapacity ? self->sparseCapacity : 32;
+        while (newCap < needed) newCap *= 2;
+        self->sparseRegisters = (SparseEntry*)realloc(
+            self->sparseRegisters, newCap * sizeof(SparseEntry));
+        self->sparseCapacity = newCap;
+    }
+
+    /* Backwards merge: walk both sorted sequences from the end and write
+     * into the tail of sparseRegisters. This is safe because the write
+     * position is always >= the read position in the existing array. */
+    i = self->sparseCount; /* read cursor for existing entries */
+    j = bufCount;          /* read cursor for buffer entries */
+    w = needed;            /* write cursor */
+    dupes = 0;
+
+    while (i > 0 && j > 0) {
+        if (self->sparseRegisters[i - 1].index > self->sparseBuffer[j - 1].index) {
+            self->sparseRegisters[--w] = self->sparseRegisters[--i];
+        } else if (self->sparseRegisters[i - 1].index < self->sparseBuffer[j - 1].index) {
+            /* New entry from buffer */
+            self->sparseRegisters[--w] = self->sparseBuffer[--j];
+            self->histogram[0]--;
+            self->histogram[self->sparseRegisters[w].fsb]++;
+        } else {
+            /* Duplicate index: take the max fsb */
+            --i; --j; --w;
+            if (self->sparseBuffer[j].fsb > self->sparseRegisters[i].fsb) {
+                self->histogram[self->sparseRegisters[i].fsb]--;
+                self->histogram[self->sparseBuffer[j].fsb]++;
+                self->sparseRegisters[w].index = self->sparseRegisters[i].index;
+                self->sparseRegisters[w].fsb = self->sparseBuffer[j].fsb;
+            } else {
+                self->sparseRegisters[w] = self->sparseRegisters[i];
+            }
+            dupes++;
+        }
+    }
+
+    /* Copy remaining buffer entries */
+    while (j > 0) {
+        self->sparseRegisters[--w] = self->sparseBuffer[--j];
+        self->histogram[0]--;
+        self->histogram[self->sparseRegisters[w].fsb]++;
+    }
+
+    /* Close the gap left by duplicates. Untouched entries sit at 0..i-1,
+     * merged entries sit at w..needed-1. Shift them together. */
+    if (w > i) {
+        memmove(self->sparseRegisters + i, self->sparseRegisters + w,
+                (needed - w) * sizeof(SparseEntry));
+    }
+
+    self->sparseCount = needed - dupes;
     self->bufferSize = 0;
 }
 
@@ -421,67 +406,48 @@ int transformToDense(HyperLogLog* self) {
 
     flushRegisterBuffer(self);
 
-    struct Node *next = NULL;
-    struct Node *current = self->sparseRegisterList;
-
-    while (current != NULL) {
-        setDenseRegister(current->index, current->fsb, self->registers);
-        next = current->next;
-        current = next;
+    for (uint64_t i = 0; i < self->sparseCount; i++) {
+        setDenseRegister(self->sparseRegisters[i].index,
+                         self->sparseRegisters[i].fsb,
+                         self->registers);
     }
 
-    current = self->sparseRegisterList;
+    free(self->sparseRegisters);
+    self->sparseRegisters = NULL;
+    self->sparseCount = 0;
+    self->sparseCapacity = 0;
 
-    while (current != NULL) {
-        next = current;
-        current = current->next;
+    free(self->sparseBuffer);
+    self->sparseBuffer = NULL;
 
-        if (next != NULL) {
-            free(next);
-            next = NULL;
-        }
-    }
-
-    if (self->sparseRegisterBuffer != NULL) {
-        free(self->sparseRegisterBuffer);
-        self->sparseRegisterBuffer = NULL;
-    }
-
-    self->sparseRegisterList = NULL;
-    self->nodeCache = NULL;
     self->isSparse = 0;
 
     return 0;
 }
 
 
-/* Gets the register value at the specified index. */
+/* Gets the register value at the specified index using binary search. */
 static inline uint64_t
 getSparseRegister(HyperLogLog* self, uint64_t index)
 {
-    struct Node *current = NULL;
+    uint64_t lo, hi, mid;
 
     if (self->bufferSize > 0) {
         flushRegisterBuffer(self);
     }
 
-    current = self->sparseRegisterList;
+    lo = 0;
+    hi = self->sparseCount;
 
-    /* Can we used the cache? */
-    if (self->nodeCache != NULL && self->nodeCache->index <= index) {
-        current = self->nodeCache;
-    }
-
-    while (current != NULL) {
-
-        if (current->index > index) {
-            return 0;
-        } else if (current->index == index) {
-            self->nodeCache = current;
-            return current->fsb;
+    while (lo < hi) {
+        mid = lo + (hi - lo) / 2;
+        if (self->sparseRegisters[mid].index < index) {
+            lo = mid + 1;
+        } else if (self->sparseRegisters[mid].index > index) {
+            hi = mid;
+        } else {
+            return self->sparseRegisters[mid].fsb;
         }
-
-        current = current->next;
     }
 
     return 0;
@@ -495,8 +461,8 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
 {
     /* Add an element to the buffer if there is room */
     if (self->bufferSize < self->maxBufferSize) {
-        self->sparseRegisterBuffer[self->bufferSize].index = index;
-        self->sparseRegisterBuffer[self->bufferSize].fsb = fsb;
+        self->sparseBuffer[self->bufferSize].index = index;
+        self->sparseBuffer[self->bufferSize].fsb = fsb;
         self->bufferSize++;
     }
 
@@ -504,8 +470,8 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
     else {
         flushRegisterBuffer(self);
         self->bufferSize = 1;
-        self->sparseRegisterBuffer[0].index = index;
-        self->sparseRegisterBuffer[0].fsb = fsb;
+        self->sparseBuffer[0].index = index;
+        self->sparseBuffer[0].fsb = fsb;
     }
 }
 
@@ -522,7 +488,7 @@ static inline int setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb)
         setSparseRegister(self, index, newFsb);
 
         /* Switch to dense representation? */
-        if (self->listSize >= self->maxListSize) {
+        if (self->sparseCount >= self->maxListSize) {
             if (transformToDense(self) < 0) {
                 return -1;
             }
@@ -588,11 +554,9 @@ static PyObject* HyperLogLog_registers(HyperLogLog* self)
         /* Initialize all registers to zero */
         memset(buf, 0, size);
 
-        /* Walk the sorted linked list and fill in non-zero registers */
-        struct Node* current = self->sparseRegisterList;
-        while (current != NULL) {
-            buf[current->index] = current->fsb;
-            current = current->next;
+        /* Walk the sorted array and fill in non-zero registers */
+        for (uint64_t i = 0; i < self->sparseCount; i++) {
+            buf[self->sparseRegisters[i].index] = self->sparseRegisters[i].fsb;
         }
     } else {
         /* Unpack 6-bit dense registers */
@@ -611,20 +575,16 @@ static PyObject* HyperLogLog__get_meta(HyperLogLog* self, PyObject* args)
     char version[8];
     sprintf(version, "%u.%u.%u", PY_MAJOR_VERSION, PY_MINOR_VERSION, PY_MICRO_VERSION);
 
-    uint64_t cacheIndex = self->nodeCache == NULL ? 0 : self->nodeCache->index;
-    uint64_t cacheValue = self->nodeCache == NULL ? 0 : self->nodeCache->fsb;
-
-    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:i,s:i,s:k,s:k,s:k,s:k,s:s,s:s}",
+    return Py_BuildValue("{s:k,s:k,s:k,s:k,s:k,s:i,s:i,s:k,s:k,s:s,s:s}",
         "added", self->added,
-        "list_size", self->listSize,
+        "list_size", self->sparseCount,
+        "sparse_capacity", self->sparseCapacity,
         "buffer_size", self->bufferSize,
         "cache", self->cache,
         "is_cached", self->isCached,
         "is_sparse", self->isSparse,
         "max_list_size", self->maxListSize,
         "max_buffer_size", self->maxBufferSize,
-        "node_cache_index", cacheIndex,
-        "node_cache_value", cacheValue,
         "py_version", version,
         "hll_version", HLL_VERSION
     );
@@ -651,15 +611,8 @@ static void HyperLogLog_dealloc(HyperLogLog* self)
     free(self->registers);
 
     if (self->isSparse) {
-        struct Node *next = NULL;
-        struct Node *current = self->sparseRegisterList;
-        while (current != NULL) {
-            next = current->next;
-            free(current);
-            current = next;
-        }
-
-        free(self->sparseRegisterBuffer);
+        free(self->sparseRegisters);
+        free(self->sparseBuffer);
     }
 
     Py_TYPE(self)->tp_free((PyObject*) self);
@@ -777,14 +730,14 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
     self->added = 0;
     self->cache = 0;
     self->isCached = 0;
-    self->listSize = 0;
+    self->sparseCount = 0;
+    self->sparseCapacity = 0;
     self->size = 1UL << self->p;
     self->histogram = (uint64_t*)calloc(65, sizeof(uint64_t)); /* Keep a count of register values */
     self->histogram[0] = self->size; /* Set the zeroes count */
-    self->nodeCache = NULL;
     self->registers = NULL;
-    self->sparseRegisterList = NULL;
-    self->sparseRegisterBuffer = NULL;
+    self->sparseRegisters = NULL;
+    self->sparseBuffer = NULL;
 
     if (sparse) {
         self->isSparse = 1;
@@ -817,7 +770,7 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
             }
         }
 
-        self->sparseRegisterBuffer = (struct Node*)malloc(sizeof(struct Node) * self->maxBufferSize);
+        self->sparseBuffer = (SparseEntry*)malloc(sizeof(SparseEntry) * self->maxBufferSize);
     } else {
         uint64_t bytes = (self->size*6)/8 + 1;
         self->registers = (uint8_t*)calloc(bytes, sizeof(uint8_t));
@@ -1004,7 +957,7 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
 
     if (self->isSparse) {
         flushRegisterBuffer(self);
-        dumpSize = self->listSize + 65 + 7;
+        dumpSize = self->sparseCount + 65 + 7;
     } else {
         dumpSize = self->size + 65 + 7;
     }
@@ -1018,7 +971,7 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
 
     PyList_SetItem(state, 0, Py_BuildValue("k", (uint64_t)self->isSparse));
     PyList_SetItem(state, 1, Py_BuildValue("k", self->added));
-    PyList_SetItem(state, 2, Py_BuildValue("k", self->listSize));
+    PyList_SetItem(state, 2, Py_BuildValue("k", self->sparseCount));
     PyList_SetItem(state, 3, Py_BuildValue("k", self->isCached));
     PyList_SetItem(state, 4, Py_BuildValue("k", self->cache));
     PyList_SetItem(state, 5, Py_BuildValue("k", 0));
@@ -1031,23 +984,13 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
     }
 
     if (self->isSparse) { /* Handle sparse representation */
-        if (self->nodeCache != NULL) {
-            PyList_SetItem(state, 5, Py_BuildValue("k", self->nodeCache->index));
-        }
-
-        struct Node *current = NULL;
         PyObject *pyList = NULL;
 
-        current = self->sparseRegisterList;
-        uint64_t j = 72;
-
-        while (current != NULL) {
+        for (uint64_t j = 0; j < self->sparseCount; j++) {
             pyList = PyList_New(2);
-            PyList_SetItem(pyList, 0, Py_BuildValue("k", current->index));
-            PyList_SetItem(pyList, 1, Py_BuildValue("k", current->fsb));
-            PyList_SetItem(state, j, pyList);
-            current = current->next;
-            j++;
+            PyList_SetItem(pyList, 0, Py_BuildValue("k", self->sparseRegisters[j].index));
+            PyList_SetItem(pyList, 1, Py_BuildValue("k", self->sparseRegisters[j].fsb));
+            PyList_SetItem(state, 72 + j, pyList);
         }
     } else { /* Handle dense representation */
         for (uint64_t i = 72; i < self->size + 72; i++) {
@@ -1075,18 +1018,16 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     PyObject* dump;
     PyObject* valPtr;
     unsigned long val;
-    uint64_t nodeCacheIndex;
 
     if (!PyArg_ParseTuple(state, "O:setstate", &dump)) return NULL;
 
     self->isSparse = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 0));
     self->added    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 1));
-    self->listSize = PyLong_AsUnsignedLong(PyList_GetItem(dump, 2));
+    self->sparseCount = PyLong_AsUnsignedLong(PyList_GetItem(dump, 2));
     self->isCached = (bool) PyLong_AsUnsignedLong(PyList_GetItem(dump, 3));
     self->cache    = PyLong_AsUnsignedLong(PyList_GetItem(dump, 4));
-    nodeCacheIndex = PyLong_AsUnsignedLong(PyList_GetItem(dump, 5));
 
-    uint64_t dumpSize = self->isSparse ? self->listSize : self->size;
+    uint64_t dumpSize = self->isSparse ? self->sparseCount : self->size;
     dumpSize += 65 + 7;
 
     for (int i = 7; i < 65 + 7; i++) {
@@ -1098,31 +1039,20 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
     if (self->isSparse) {
         uint64_t index;
         uint64_t fsb;
-        struct Node* node = NULL;
-        struct Node* prev = NULL;
         PyObject *lst = NULL;
 
-        for (uint64_t i = 65 + 7; i < dumpSize; i++) {
-            lst = PyList_GetItem(dump, i);
+        /* Allocate exact capacity for the deserialized entries */
+        self->sparseCapacity = self->sparseCount;
+        self->sparseRegisters = (SparseEntry*)malloc(
+            self->sparseCapacity * sizeof(SparseEntry));
+
+        for (uint64_t i = 0; i < self->sparseCount; i++) {
+            lst = PyList_GetItem(dump, 72 + i);
             index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
             fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
 
-            node = (struct Node*)malloc(sizeof(struct Node));
-            node->index = index;
-            node->fsb = fsb;
-            node->next = NULL;
-
-            if (i == 65 + 7) {
-                self->sparseRegisterList = node;
-                prev = node;
-            } else {
-                prev->next = node;
-                prev = node;
-            }
-
-            if (node->index == nodeCacheIndex) {
-                self->nodeCache = node;
-            }
+            self->sparseRegisters[i].index = index;
+            self->sparseRegisters[i].fsb = (uint8_t)fsb;
         }
     } else {
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
