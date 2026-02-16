@@ -114,10 +114,10 @@ class TestMerging(unittest.TestCase):
             self.assertEqual(max_fsb, hll_c.get_register(i))
 
     def test_sparse_x_sparse_merge(self):
-        k = 8
-        hll_a = HyperLogLog(k, max_sparse_list_size=128)
-        hll_b = HyperLogLog(k, max_sparse_list_size=128)
-        hll_c = HyperLogLog(k, max_sparse_list_size=128)
+        k = 12
+        hll_a = HyperLogLog(k)
+        hll_b = HyperLogLog(k)
+        hll_c = HyperLogLog(k)
 
         for i in range(32):
             hll_a.add(str(randint(1, 1024)))
