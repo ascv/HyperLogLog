@@ -11,6 +11,14 @@
 #include "structmember.h"
 #include "../lib/murmur2.h"
 
+/* Packed sparse entry: bits 31..6 = register index, bits 5..0 = fsb value.
+ * Supports p up to 26. Each entry is 4 bytes instead of 16. */
+typedef uint32_t SparseEntry;
+
+#define SPARSE_INDEX(e) ((uint32_t)(e) >> 6)
+#define SPARSE_FSB(e)   ((uint8_t)((e) & 0x3F))
+#define SPARSE_ENTRY(idx, fsb) (((uint32_t)(idx) << 6) | ((uint32_t)(fsb) & 0x3F))
+
 typedef struct {
     PyObject_HEAD
     uint8_t* registers; /* Densely encoded registers */
@@ -24,19 +32,14 @@ typedef struct {
     bool isSparse; /* If sparse encoding is currently in use */
 
     /* Fields used for sparse representation */
-    struct SparseEntry* sparseRegisters; /* Sorted array of non-zero registers */
-    struct SparseEntry* sparseBuffer; /* Temporary buffer of entries to be merged */
+    SparseEntry* sparseRegisters; /* Sorted array of non-zero registers */
+    SparseEntry* sparseBuffer; /* Temporary buffer of entries to be merged */
     uint64_t sparseCount; /* Number of entries in the sorted array */
     uint64_t sparseCapacity; /* Allocated capacity of the sorted array */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
     uint64_t maxListSize; /* Max number of entries before switching to dense */
 } HyperLogLog;
-
-typedef struct SparseEntry {
-    uint64_t index;
-    uint8_t fsb;
-} SparseEntry;
 
 
 /* ========================== Dense representation ========================= */
@@ -288,27 +291,22 @@ static inline void setDenseRegister(uint64_t m, uint8_t n, uint8_t* regs)
  */
 
 
-/* Compares two sparse register entries. Sorts ascending by index, then
+/* Compares two packed sparse entries. Sorts ascending by index, then
  * descending by fsb so that the highest value comes first for duplicates. */
 int compareEntries(const void* a, const void* b) {
+    SparseEntry A = *(const SparseEntry*)a;
+    SparseEntry B = *(const SparseEntry*)b;
+    uint32_t idxA = SPARSE_INDEX(A);
+    uint32_t idxB = SPARSE_INDEX(B);
 
-    int result = -1;
-    SparseEntry* A = (SparseEntry*) a;
-    SparseEntry* B = (SparseEntry*) b;
+    if (idxA != idxB) return (idxA < idxB) ? -1 : 1;
 
-    if (A->index == B->index) {
-        if (A->fsb > B->fsb) {
-            result = -1;
-        } else if (A->fsb < B->fsb) {
-            result = 1;
-        } else {
-            result = 0;
-        }
-    } else if (A->index > B->index) {
-        result = 1;
-    }
-
-    return result;
+    /* Same index: descending by fsb so highest value comes first */
+    uint8_t fsbA = SPARSE_FSB(A);
+    uint8_t fsbB = SPARSE_FSB(B);
+    if (fsbA > fsbB) return -1;
+    if (fsbA < fsbB) return 1;
+    return 0;
 }
 
 
@@ -325,7 +323,7 @@ void flushRegisterBuffer(HyperLogLog* self)
     /* Deduplicate buffer: keep only the first entry per index (highest fsb) */
     bufCount = 1;
     for (i = 1; i < self->bufferSize; i++) {
-        if (self->sparseBuffer[i].index != self->sparseBuffer[bufCount - 1].index) {
+        if (SPARSE_INDEX(self->sparseBuffer[i]) != SPARSE_INDEX(self->sparseBuffer[bufCount - 1])) {
             self->sparseBuffer[bufCount] = self->sparseBuffer[i];
             bufCount++;
         }
@@ -350,21 +348,25 @@ void flushRegisterBuffer(HyperLogLog* self)
     dupes = 0;
 
     while (i > 0 && j > 0) {
-        if (self->sparseRegisters[i - 1].index > self->sparseBuffer[j - 1].index) {
+        uint32_t regIdx = SPARSE_INDEX(self->sparseRegisters[i - 1]);
+        uint32_t bufIdx = SPARSE_INDEX(self->sparseBuffer[j - 1]);
+
+        if (regIdx > bufIdx) {
             self->sparseRegisters[--w] = self->sparseRegisters[--i];
-        } else if (self->sparseRegisters[i - 1].index < self->sparseBuffer[j - 1].index) {
+        } else if (regIdx < bufIdx) {
             /* New entry from buffer */
             self->sparseRegisters[--w] = self->sparseBuffer[--j];
             self->histogram[0]--;
-            self->histogram[self->sparseRegisters[w].fsb]++;
+            self->histogram[SPARSE_FSB(self->sparseRegisters[w])]++;
         } else {
             /* Duplicate index: take the max fsb */
             --i; --j; --w;
-            if (self->sparseBuffer[j].fsb > self->sparseRegisters[i].fsb) {
-                self->histogram[self->sparseRegisters[i].fsb]--;
-                self->histogram[self->sparseBuffer[j].fsb]++;
-                self->sparseRegisters[w].index = self->sparseRegisters[i].index;
-                self->sparseRegisters[w].fsb = self->sparseBuffer[j].fsb;
+            uint8_t bufFsb = SPARSE_FSB(self->sparseBuffer[j]);
+            uint8_t regFsb = SPARSE_FSB(self->sparseRegisters[i]);
+            if (bufFsb > regFsb) {
+                self->histogram[regFsb]--;
+                self->histogram[bufFsb]++;
+                self->sparseRegisters[w] = SPARSE_ENTRY(regIdx, bufFsb);
             } else {
                 self->sparseRegisters[w] = self->sparseRegisters[i];
             }
@@ -376,7 +378,7 @@ void flushRegisterBuffer(HyperLogLog* self)
     while (j > 0) {
         self->sparseRegisters[--w] = self->sparseBuffer[--j];
         self->histogram[0]--;
-        self->histogram[self->sparseRegisters[w].fsb]++;
+        self->histogram[SPARSE_FSB(self->sparseRegisters[w])]++;
     }
 
     /* Close the gap left by duplicates. Untouched entries sit at 0..i-1,
@@ -407,8 +409,8 @@ int transformToDense(HyperLogLog* self) {
     flushRegisterBuffer(self);
 
     for (uint64_t i = 0; i < self->sparseCount; i++) {
-        setDenseRegister(self->sparseRegisters[i].index,
-                         self->sparseRegisters[i].fsb,
+        setDenseRegister(SPARSE_INDEX(self->sparseRegisters[i]),
+                         SPARSE_FSB(self->sparseRegisters[i]),
                          self->registers);
     }
 
@@ -441,12 +443,13 @@ getSparseRegister(HyperLogLog* self, uint64_t index)
 
     while (lo < hi) {
         mid = lo + (hi - lo) / 2;
-        if (self->sparseRegisters[mid].index < index) {
+        uint32_t midIdx = SPARSE_INDEX(self->sparseRegisters[mid]);
+        if (midIdx < index) {
             lo = mid + 1;
-        } else if (self->sparseRegisters[mid].index > index) {
+        } else if (midIdx > index) {
             hi = mid;
         } else {
-            return self->sparseRegisters[mid].fsb;
+            return SPARSE_FSB(self->sparseRegisters[mid]);
         }
     }
 
@@ -461,8 +464,7 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
 {
     /* Add an element to the buffer if there is room */
     if (self->bufferSize < self->maxBufferSize) {
-        self->sparseBuffer[self->bufferSize].index = index;
-        self->sparseBuffer[self->bufferSize].fsb = fsb;
+        self->sparseBuffer[self->bufferSize] = SPARSE_ENTRY(index, fsb);
         self->bufferSize++;
     }
 
@@ -470,8 +472,7 @@ static inline void setSparseRegister(HyperLogLog* self, uint64_t index, uint8_t 
     else {
         flushRegisterBuffer(self);
         self->bufferSize = 1;
-        self->sparseBuffer[0].index = index;
-        self->sparseBuffer[0].fsb = fsb;
+        self->sparseBuffer[0] = SPARSE_ENTRY(index, fsb);
     }
 }
 
@@ -556,7 +557,7 @@ static PyObject* HyperLogLog_registers(HyperLogLog* self)
 
         /* Walk the sorted array and fill in non-zero registers */
         for (uint64_t i = 0; i < self->sparseCount; i++) {
-            buf[self->sparseRegisters[i].index] = self->sparseRegisters[i].fsb;
+            buf[SPARSE_INDEX(self->sparseRegisters[i])] = SPARSE_FSB(self->sparseRegisters[i]);
         }
     } else {
         /* Unpack 6-bit dense registers */
@@ -988,8 +989,8 @@ static PyObject* HyperLogLog_reduce(HyperLogLog* self)
 
         for (uint64_t j = 0; j < self->sparseCount; j++) {
             pyList = PyList_New(2);
-            PyList_SetItem(pyList, 0, Py_BuildValue("k", self->sparseRegisters[j].index));
-            PyList_SetItem(pyList, 1, Py_BuildValue("k", self->sparseRegisters[j].fsb));
+            PyList_SetItem(pyList, 0, Py_BuildValue("k", (unsigned long)SPARSE_INDEX(self->sparseRegisters[j])));
+            PyList_SetItem(pyList, 1, Py_BuildValue("k", (unsigned long)SPARSE_FSB(self->sparseRegisters[j])));
             PyList_SetItem(state, 72 + j, pyList);
         }
     } else { /* Handle dense representation */
@@ -1051,8 +1052,7 @@ static PyObject* HyperLogLog_set_state(HyperLogLog* self, PyObject* state)
             index = PyLong_AsUnsignedLong(PyList_GetItem(lst, 0));
             fsb = PyLong_AsUnsignedLong(PyList_GetItem(lst, 1));
 
-            self->sparseRegisters[i].index = index;
-            self->sparseRegisters[i].fsb = (uint8_t)fsb;
+            self->sparseRegisters[i] = SPARSE_ENTRY(index, fsb);
         }
     } else {
         for (uint64_t i = 65 + 7; i < dumpSize; i++) {
