@@ -38,7 +38,7 @@ typedef struct {
     uint64_t sparseCapacity; /* Allocated capacity of the sorted array */
     uint64_t bufferSize; /* Number of elements in the temporary buffer */
     uint64_t maxBufferSize; /* Max number of elements for the temporary buffer */
-    uint64_t maxListSize; /* Max number of entries before switching to dense */
+    uint64_t maxListSize; /* Used to derive default maxBufferSize */
 } HyperLogLog;
 
 
@@ -260,34 +260,39 @@ static inline void setDenseRegister(uint64_t m, uint8_t n, uint8_t* regs)
 /*
  * When a HyperLogLog is created its register values are initialized to zero.
  * Because the registers share the same value it is inefficient to store
- * them individually. Instead only non-zero registers are stored. These
- * registers are stored as nodes in a sorted link list. For example the
- * registers
+ * them individually. Instead only non-zero registers are stored in a sorted
+ * dynamic array of packed 32-bit entries. Each entry encodes a register index
+ * and its value into a single uint32_t:
+ *
+ *     +--------------------------------+
+ *     | index (bits 31..6) | fsb (5..0)|
+ *     +--------------------------------+
+ *
+ * For example the registers
  *
  *     +-+-+-+-+-+-+-+-+
  *     |0|3|0|0|1|1|0|2|
  *     +-+-+-+-+-+-+-+-+
  *
- * are represented with the following linked list (sorted by index):
+ * are represented with the following sorted array:
  *
- *            index
- *              |
- *              v
- *     +---+   +---+   +---+   +---+
- *     |1,3|-->|4,1|-->|5,1|-->|7,2|
- *     +---+   +---+   +---+   +---+
- *                ^
- *                |
- *              value
+ *     +-----+-----+-----+-----+
+ *     | 1,3 | 4,1 | 5,1 | 7,2 |
+ *     +-----+-----+-----+-----+
+ *       [0]   [1]   [2]   [3]
  *
- * To avoid the worst case of traversing the linked list every time add()
- * is called a temporary register buffer is used to store the new register
- * values. When the buffer is full it is sorted and the linked list is
- * updated. Because both the list and buffer are sorted this update can be
- * done in one pass.
+ * Because the array is sorted by index, individual registers can be looked
+ * up using binary search in O(log n). The array grows dynamically, doubling
+ * in capacity when more space is needed via realloc.
  *
- * Eventually the linked list grows too large to save memory. When this
- * happens the HyperLogLog switches to a dense representation.
+ * To avoid an O(n) insertion into the sorted array every time add() is
+ * called, a temporary buffer collects new entries. When the buffer is full
+ * it is sorted and merged into the main array in one pass. Because both
+ * the array and buffer are sorted this merge runs in O(n + k) time.
+ *
+ * Eventually the sparse array's allocated memory approaches that of the
+ * dense representation. When the capacity would exceed the dense size in
+ * bytes, the HyperLogLog switches to dense representation.
  */
 
 
@@ -310,7 +315,8 @@ int compareEntries(const void* a, const void* b) {
 }
 
 
-/* Updates the sorted register array using the items in the buffer. */
+/* Merges the temporary buffer into the sorted register array. Both sequences
+ * are sorted, so the merge runs in a single backwards pass. */
 void flushRegisterBuffer(HyperLogLog* self)
 {
     uint64_t i, j, w, bufCount, needed, newCap, dupes;
@@ -1024,22 +1030,22 @@ static PyObject* HyperLogLog_new(PyTypeObject* type, PyObject*args, PyObject* kw
 /*
  * Serialization method to pickle a HyperLogLog object.
  *
- * HyperLogLog's are serialized using a single list. The first 7 elements
- * are fields, the next 65 elements are the histogram, and the remaining
- * elements represent the registers. Let N be the total number of elements in
- * in the list, then the serialization schema is:
+ * HyperLogLog's are serialized using a single Python list. The first 7
+ * elements are fields, the next 65 elements are the histogram, and the
+ * remaining elements represent the registers. Let N be the total number of
+ * elements in the list, then the serialization schema is:
  *
  *     Index  Description
  *     -----  -----------
- *     0      version
- *     1      isSparse field
- *     2      added field
- *     3      listSize field
- *     4      isCached field
- *     5      cache field
- *     6      index of node that is currently cached
- *     7-72   register histogram values
- *     73-N   register values, if sparse then tuples of the form (register
+ *     0      isSparse field
+ *     1      added field
+ *     2      sparseCount field
+ *     3      isCached field
+ *     4      cache field
+ *     5      (reserved)
+ *     6      (reserved)
+ *     7-71   register histogram values
+ *     72-N   register values, if sparse then pairs of the form (register
  *            index, register value) otherwise integers
  */
 static PyObject* HyperLogLog_reduce(HyperLogLog* self)
