@@ -791,6 +791,90 @@ static int HyperLogLog_init(HyperLogLog* self, PyObject* args, PyObject* kwds)
 }
 
 
+/* Fast merge path when both sketches are sparse. Two-pointer walk over
+ * sorted arrays: O(countA + countB) instead of O(2^p).
+ * Returns 0 on success, -1 on error (sets Python exception). */
+static int mergeSparse(HyperLogLog* self, HyperLogLog* other)
+{
+    flushRegisterBuffer(self);
+    flushRegisterBuffer(other);
+
+    uint64_t countA = self->sparseCount;
+    uint64_t countB = other->sparseCount;
+    SparseEntry* A = self->sparseRegisters;
+    SparseEntry* B = other->sparseRegisters;
+
+    /* Worst case: all entries are disjoint */
+    uint64_t needed = countA + countB;
+    if (needed > self->sparseCapacity) {
+        uint64_t newCap = self->sparseCapacity ? self->sparseCapacity : 32;
+        while (newCap < needed) newCap *= 2;
+        self->sparseRegisters = (SparseEntry*)realloc(
+            self->sparseRegisters, newCap * sizeof(SparseEntry));
+        A = self->sparseRegisters;
+        self->sparseCapacity = newCap;
+    }
+
+    /* Backwards merge into tail of sparseRegisters (same technique as
+     * flushRegisterBuffer). Safe because write pos >= read pos. */
+    uint64_t i = countA;  /* read cursor for self */
+    uint64_t j = countB;  /* read cursor for other */
+    uint64_t w = needed;  /* write cursor */
+    uint64_t dupes = 0;
+
+    while (i > 0 && j > 0) {
+        uint32_t idxA = SPARSE_INDEX(A[i - 1]);
+        uint32_t idxB = SPARSE_INDEX(B[j - 1]);
+
+        if (idxA > idxB) {
+            A[--w] = A[--i];
+        } else if (idxA < idxB) {
+            /* New entry from other */
+            A[--w] = B[--j];
+            self->histogram[0]--;
+            self->histogram[SPARSE_FSB(A[w])]++;
+        } else {
+            /* Same index: take the max fsb */
+            --i; --j; --w;
+            uint8_t fsbA = SPARSE_FSB(A[i]);
+            uint8_t fsbB = SPARSE_FSB(B[j]);
+            if (fsbB > fsbA) {
+                self->histogram[fsbA]--;
+                self->histogram[fsbB]++;
+                A[w] = SPARSE_ENTRY(idxA, fsbB);
+            } else {
+                A[w] = A[i];
+            }
+            dupes++;
+        }
+    }
+
+    /* Copy remaining entries from other */
+    while (j > 0) {
+        A[--w] = B[--j];
+        self->histogram[0]--;
+        self->histogram[SPARSE_FSB(A[w])]++;
+    }
+
+    /* Close the gap left by duplicates */
+    if (w > i) {
+        memmove(A + i, A + w, (needed - w) * sizeof(SparseEntry));
+    }
+
+    self->sparseCount = needed - dupes;
+
+    /* Check if we should convert to dense */
+    uint64_t denseBytes = (self->size * 6) / 8 + 1;
+    if (self->sparseCapacity * sizeof(SparseEntry) >= denseBytes) {
+        if (transformToDense(self) < 0) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
 /* Merges another HyperLogLog into the current HyperLogLog. The registers of
  * the other HyperLogLog are unaffected. */
 static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
@@ -814,24 +898,29 @@ static PyObject* HyperLogLog_merge(HyperLogLog* self, PyObject* args)
 
     self->isCached = 0;
 
-    for (uint64_t i = 0; i < self->size; i++) {
-        uint64_t newVal;
-        uint64_t oldVal;
+    /* Fast path: both sparse — two-pointer merge O(countA + countB) */
+    if (self->isSparse && otherHLL->isSparse) {
+        if (mergeSparse(self, otherHLL) < 0) return NULL;
+    } else {
+        for (uint64_t i = 0; i < self->size; i++) {
+            uint64_t newVal;
+            uint64_t oldVal;
 
-        if (self->isSparse) {
-            oldVal = getSparseRegister(self, i);
-        } else {
-            oldVal = getDenseRegister(i, self->registers);
-        }
+            if (self->isSparse) {
+                oldVal = getSparseRegister(self, i);
+            } else {
+                oldVal = getDenseRegister(i, self->registers);
+            }
 
-        if (otherHLL->isSparse) {
-            newVal = getSparseRegister(otherHLL, i);
-        } else {
-            newVal = getDenseRegister(i, otherHLL->registers);
-        }
+            if (otherHLL->isSparse) {
+                newVal = getSparseRegister(otherHLL, i);
+            } else {
+                newVal = getDenseRegister(i, otherHLL->registers);
+            }
 
-        if (oldVal < newVal) {
-            if (setRegister(self, i, (uint8_t)newVal) < 0) return NULL;
+            if (oldVal < newVal) {
+                if (setRegister(self, i, (uint8_t)newVal) < 0) return NULL;
+            }
         }
     }
 
