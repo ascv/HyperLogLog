@@ -35,6 +35,50 @@ print(estimate)
 Changelog
 =========
 
+3.0
+---
+
+**New features:**
+
+* Added `intersection_cardinality()` for estimating the intersection of two
+  HyperLogLogs using Ertl's Joint Maximum Likelihood Estimation (JMLE) method.
+* Added `registers()` which returns all register values as a `bytes` object
+  of length 2^p.
+* Added `add_range(start, count)` for bulk insertion of sequential integers
+  without Python-to-C overhead.
+* Added type checking to `merge()` — passing non-HyperLogLog objects now
+  raises `TypeError`.
+
+**Sparse representation rewrite:**
+
+* Replaced the sparse linked list with a sorted dynamic array of packed
+  entries. Each entry is 4 bytes (down from 16+ bytes per linked list node),
+  improving cache locality and reducing memory overhead.
+* Sparse-to-dense conversion is now based on allocated capacity vs dense
+  representation size, instead of a fixed count threshold. The HyperLogLog
+  switches to dense when the sparse array allocation would exceed the
+  equivalent dense storage.
+* Sparse-sparse `merge()` now uses a two-pointer merge in O(n) time instead
+  of iterating all 2^p registers.
+
+**Bug fixes:**
+
+* Fixed `transformToDense` not returning an error on allocation failure,
+  leading to NULL pointer dereference.
+* Fixed memory leaks in error paths where `malloc`'d error messages were
+  never freed.
+* Fixed double-counting in `add_range()` where `added` was incremented twice
+  per element.
+* Fixed incorrect `Py_ssize_t` types for `PyArg_ParseTuple` `s#` format in
+  `add()` and `hash()`.
+* Fixed `_get_meta()` reporting incorrect `max_buffer_size`.
+
+**Cleanup:**
+
+* Removed stale `setMemoryErrorMsg` declaration from header.
+* Removed unused `.travis.yml`.
+* Synced version strings across `hll.c` and `setup.py`.
+
 2.4
 ---
 
@@ -96,7 +140,7 @@ increases the accuracy and using less registers decreases the accuracy. The
 number of registers is set in powers of 2 using the parameter `p` and defaults
 to `p=12` or $2^{12}$ registers.
 ```
->>> from hll import HyperLogLog
+>>> from HLL import HyperLogLog
 >>> hll = HyperLogLog() # Default to 2^12 registers
 >>> hll.size()
 4096
@@ -147,34 +191,43 @@ of their respective registers:
 2
 ```
 
+Intersection cardinality
+------------------------
+
+The intersection cardinality of two `HyperLogLog` objects can be estimated
+using Ertl's Joint Maximum Likelihood Estimation (JMLE) method [2]. Both
+objects must have the same `p` value:
+```
+>>> A = HyperLogLog(p=12)
+>>> B = HyperLogLog(p=12)
+>>> for i in range(50000):
+...     A.add(str(i))
+...     B.add(str(i))
+>>> for i in range(50000, 100000):
+...     A.add(str(i))
+>>> A.intersection_cardinality(B)
+50164
+```
+
 Register representation
 -----------------------
 
 Registers are stored using both sparse and dense representation. Originally
 all registers are initialized to zero. However storing all these zeroes
-individually is wasteful. Instead a sorted linked list [3] is used to store
-only registers that have been set (e.g. have a non-zero value). When this list
-reaches sufficient size the `HyperLogLog` object will switch to using dense
-representation where registers are stored invidiaully using 6 bits.
+individually is wasteful. Inspired by the sorted linked list approach in [3],
+a sorted dynamic array of packed 4-byte entries is used to store only registers
+that have been set (e.g. have a non-zero value). When the array's allocated
+memory would exceed the equivalent dense storage, the `HyperLogLog` switches
+to dense representation where registers are stored individually using 6 bits.
 
 Sparse representation can be disabled using the `sparse` flag:
 ```
 >>> HyperLogLog(p=2, sparse=False)
 ```
 
-The maximum list size for the sparse register list determines when the
-`HyperLogLog` object switches to dense representation. This can be set
-using `max_list_size`:
-```
->>> HyperLogLog(p=15, max_list_size=10**6)
-```
-
-Traversing the sparse register list every time an item is added to the
-`HyperLogLog` to update a register is expensive. A temporary buffer is instead
-used to defer this operation. Items added to the `HyperLogLog` are first added
-to the temporary buffer. When the buffer is full the items are sorted and then
-any register updates occur. These updates can be done in one pass since both
-the temproary buffer and sparse register list are sorted.
+Adding an element to the `HyperLogLog` does not immediately update the
+sorted array. A temporary buffer is used to defer this operation. When the
+buffer is full the items are sorted and merged into the array in one pass.
 
 The buffer size can be set using `max_buffer_size`:
 ```
@@ -196,6 +249,6 @@ References
 [2] O. Ertl, "New Cardinality Estimation Methods for HyperLogLog Sketches,"
     arXiv:1706.07290 [cs], June 2017.
 
-[3] S. Heule, M. Nunkesser, A. Hall. "HyperLogLog in Practice: Algorithimic
+[3] S. Heule, M. Nunkesser, A. Hall. "HyperLogLog in Practice: Algorithmic
     Engineering of a State of the Art Cardinality Estimation Algorithm,"
     Proceedings of the EDBT 2013 Conference, ACM, Genoa March 2013.
