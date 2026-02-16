@@ -488,8 +488,11 @@ static inline int setRegister(HyperLogLog* self, uint64_t index, uint8_t newFsb)
     if (self->isSparse) {
         setSparseRegister(self, index, newFsb);
 
-        /* Switch to dense representation? */
-        if (self->sparseCount >= self->maxListSize) {
+        /* Switch to dense when the sparse array allocation exceeds
+         * the dense representation size. This triggers right after a
+         * buffer flush doubles the capacity past the threshold. */
+        uint64_t denseBytes = (self->size * 6) / 8 + 1;
+        if (self->sparseCapacity * sizeof(SparseEntry) >= denseBytes) {
             if (transformToDense(self) < 0) {
                 return -1;
             }
