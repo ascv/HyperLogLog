@@ -195,8 +195,11 @@ Intersection cardinality
 ------------------------
 
 The intersection cardinality of two `HyperLogLog` objects can be estimated
-using Ertl's Joint Maximum Likelihood Estimation (JMLE) method [2]. Both
-objects must have the same `p` value:
+using Ertl's Joint Maximum Likelihood Estimation (JMLE) method [2]. This
+estimation degrades in accuracy when the Jaccard, J=|A∩B|/|A∪B|, is less
+than .05 and severely degrades when J < .01.
+
+Note that objects objects must have the same `p` value:
 ```
 >>> A = HyperLogLog(p=12)
 >>> B = HyperLogLog(p=12)
