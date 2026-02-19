@@ -3,3 +3,4 @@ include src/hll.h
 include lib/murmur2.c
 include lib/murmur2.h
 include README.md
+include LICENSE

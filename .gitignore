@@ -1,0 +1,16 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.so
+
+# Research data
+research/data/
+
+# Virtual environments
+.venv/
+dev/
+
+# Python
+__pycache__/
+*.pyc
